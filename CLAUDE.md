@@ -24,7 +24,7 @@ Yapılacaklar ve adımlar `PLAN.md` içinde. Her oturumda önce `PLAN.md`'yi oku
 ## Ortam
 - Mac (Apple Silicon). Docker çalışıyor.
 - **n8n ve Ollama zaten var** (`~/ai-assistant`): n8n `http://localhost:5678` (Docker içinde), Ollama native `http://localhost:11434`, model `qwen3`. Bunları bu projede tekrar kurma.
-- n8n container'ı API'ye `http://host.docker.internal:5080` ile ulaşır. Bu yüzden Api portu **5080** sabit.
+- n8n container'ı API'ye `http://host.docker.internal:5081` ile ulaşır. Bu yüzden Api portu **5081** sabit (5080 makinede başka bir servis tarafından kullanılıyor).
 - FakeSap portu 5090.
 
 ## Güvenlik
@@ -34,5 +34,7 @@ Yapılacaklar ve adımlar `PLAN.md` içinde. Her oturumda önce `PLAN.md`'yi oku
 
 ## Kod stili
 - C# son sürüm özellikleri serbest (primary constructor, collection expression, record).
-- Kod içi yorumlar Türkçe ve kısa; SAP karşılığı olan yerlerde işlem kodunu yaz (`// SM37`).
-- Test isimleri: `Metot_Durum_Beklenen` biçiminde.
+- **Repo public olacak: kodda her şey İngilizce.** Değişken, sınıf, metot, yorum, log mesajı, hata/ProblemDetails metni, API cevapları, config anahtarları, commit mesajları ve README İngilizce.
+- Yorumlar kısa; SAP karşılığı olan yerlerde işlem kodunu yaz (`// SM37`).
+- Test isimleri: `Method_Condition_Expected` biçiminde.
+- İstisna: LLM'in ürettiği kullanıcıya dönük metinler (ör. Türkçe günlük özet) ayar/prompt ile Türkçe olabilir; prompt'un kendisi kodda İngilizce yazılır.

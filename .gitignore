@@ -15,7 +15,7 @@ coverage*/
 *.nupkg
 artifacts/
 
-# Local ayarlar ve secret'lar (repoya girmez)
+# Local settings and secrets (never committed)
 .env
 .env.*
 !.env.example
@@ -24,11 +24,11 @@ appsettings.*.local.json
 *.pem
 *.key
 
-# n8n export'larında credential olmamalı; local yedekler
+# n8n exports must not contain credentials; local backups
 n8n/**/*.credentials.json
 
 # macOS
 .DS_Store
 
-# Claude Code local ayarları
+# Claude Code local settings
 .claude/settings.local.json

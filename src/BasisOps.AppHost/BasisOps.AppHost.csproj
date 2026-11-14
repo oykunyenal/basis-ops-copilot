@@ -1,0 +1,17 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.6.5">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AspireUseCliBundle>true</AspireUseCliBundle>
+    <UserSecretsId>06d5b158-2c75-408e-ab14-7c658c73b233</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\BasisOps.Api\BasisOps.Api.csproj" />
+    <ProjectReference Include="..\BasisOps.Worker\BasisOps.Worker.csproj" />
+    <ProjectReference Include="..\FakeSap\FakeSap.csproj" />
+  </ItemGroup>
+</Project>

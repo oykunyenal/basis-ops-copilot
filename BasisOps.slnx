@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/BasisOps.Api/BasisOps.Api.csproj" />
+    <Project Path="src/BasisOps.AppHost/BasisOps.AppHost.csproj" />
+    <Project Path="src/BasisOps.Application/BasisOps.Application.csproj" />
+    <Project Path="src/BasisOps.Domain/BasisOps.Domain.csproj" />
+    <Project Path="src/BasisOps.Infrastructure/BasisOps.Infrastructure.csproj" />
+    <Project Path="src/BasisOps.ServiceDefaults/BasisOps.ServiceDefaults.csproj" />
+    <Project Path="src/BasisOps.Worker/BasisOps.Worker.csproj" />
+    <Project Path="src/FakeSap/FakeSap.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BasisOps.IntegrationTests/BasisOps.IntegrationTests.csproj" />
+    <Project Path="tests/BasisOps.UnitTests/BasisOps.UnitTests.csproj" />
+  </Folder>
+</Solution>

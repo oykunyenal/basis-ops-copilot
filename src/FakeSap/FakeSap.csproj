@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <!-- FakeSap is standalone: it does not reference BasisOps layers (it sits outside, like a real SAP system). -->
+  <ItemGroup>
+    <ProjectReference Include="..\BasisOps.ServiceDefaults\BasisOps.ServiceDefaults.csproj" />
+  </ItemGroup>
+</Project>

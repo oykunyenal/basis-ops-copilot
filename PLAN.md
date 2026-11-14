@@ -30,7 +30,7 @@ Hem portfolyo (GitHub) hem de teknik mülakatta anlatılacak somut örnek.
 ```
                        ┌──────────────── Aspire AppHost (dotnet run) ─────────────────┐
                        │                                                              │
-  n8n (mevcut, :5678) ─┼─HTTP─► BasisOps.Api (:5080) ──► PostgreSQL (Aspire container)│
+  n8n (mevcut, :5678) ─┼─HTTP─► BasisOps.Api (:5081) ──► PostgreSQL (Aspire container)│
    ▲  Schedule/Chat    │            ▲                        ▲                        │
    │  Telegram         │            │ aynı DB                │                        │
    │                   │      BasisOps.Worker ───────────────┘                        │
@@ -42,7 +42,7 @@ Hem portfolyo (GitHub) hem de teknik mülakatta anlatılacak somut örnek.
 ```
 
 - **n8n ve Ollama tekrar kurulmaz.** `~/ai-assistant` içindeki mevcut kurulum kullanılır.
-  - n8n container'dan API'ye adres: `http://host.docker.internal:5080`
+  - n8n container'dan API'ye adres: `http://host.docker.internal:5081`
   - Api'den Ollama'ya adres: `http://localhost:11434`
 - Aspire sadece projenin kendi parçalarını kaldırır: Postgres, FakeSap, Api, Worker. Dashboard'da log, trace ve metrikler görünür.
 
@@ -102,13 +102,13 @@ Her adım ayrı bir commit (hatta ayrı bir PR) olsun. Her adımın sonunda **"B
 Claude Code'a her adımda şunu söyle: *"PLAN.md'de Adım N'yi yap. Önce planını kısaca anlat, sonra uygula, sonunda build ve test çalıştır."*
 
 ### Adım 0: Repo ve iskelet
-- [ ] `git init`, `.gitignore` (dotnet), `README.md` taslağı, `PLAN.md` ve `CLAUDE.md` repoya.
-- [ ] Solution (`.slnx`) ve tüm projeler, proje referansları katman kurallarına göre:
+- [x] `git init`, `.gitignore` (dotnet), `README.md` taslağı, `PLAN.md` ve `CLAUDE.md` repoya.
+- [x] Solution (`.slnx`) ve tüm projeler, proje referansları katman kurallarına göre:
   - Domain ← Application ← Infrastructure ← Api / Worker.
   - Api ve Worker, ServiceDefaults'a referans verir.
-- [ ] Aspire AppHost: Postgres (`basisops` veritabanı), FakeSap, Api (sabit port **5080**), Worker. Api ve Worker Postgres'i bekler (`WaitFor`).
-- [ ] `Directory.Build.props`: `net10.0`, `Nullable enable`, `TreatWarningsAsErrors`, `ImplicitUsings`.
-- [ ] `Directory.Packages.props` ile merkezi paket versiyonu.
+- [x] Aspire AppHost: Postgres (`basisops` veritabanı), FakeSap, Api (sabit port **5081**), Worker. Api ve Worker Postgres'i bekler (`WaitFor`).
+- [x] `Directory.Build.props`: `net10.0`, `Nullable enable`, `TreatWarningsAsErrors`, `ImplicitUsings`.
+- [x] `Directory.Packages.props` ile merkezi paket versiyonu.
 
 **Bitti sayılır:** `dotnet build` hatasız. `dotnet run --project src/BasisOps.AppHost` dashboard'u açıyor, tüm kaynaklar "Running".
 **Commit:** `chore: solution skeleton with Aspire AppHost`
@@ -204,7 +204,7 @@ Claude Code'a her adımda şunu söyle: *"PLAN.md'de Adım N'yi yap. Önce plan�
 **Commit:** `feat(ai): dump analysis and daily summary with local LLM, masking and fallback`
 
 ### Adım 6: n8n workflow'ları (mevcut n8n'de)
-- [ ] Credential: Header Auth (`X-Api-Key`), base URL `http://host.docker.internal:5080`.
+- [ ] Credential: Header Auth (`X-Api-Key`), base URL `http://host.docker.internal:5081`.
 - [ ] **Basis Sabah Raporu:** Schedule (hafta içi 08:00) → `GET /reports/daily?sid=PRD` → Telegram (HTML). Hata durumunda "Rapor alınamadı" mesajı.
 - [ ] **Self-servis Asistan:** Chat Trigger → AI Agent (Ollama `qwen3`) + araçlar:
   - `kilitli_kullanicilar` → `GET /systems/{sid}/health` (ya da ayrı uç).
