@@ -114,21 +114,22 @@ Claude Code'a her adımda şunu söyle: *"PLAN.md'de Adım N'yi yap. Önce plan�
 **Commit:** `chore: solution skeleton with Aspire AppHost`
 
 ### Adım 1: FakeSap
-- [ ] Sistemler: `PRD` (prod), `QAS`, `DEV`. Her istek `/sap/{sid}/...` ile başlar.
-- [ ] Okuma uçları (SAP'deki karşılıkları yorumda yazsın):
+- [x] Sistemler: `PRD` (prod), `QAS`, `DEV`. Her istek `/sap/{sid}/...` ile başlar.
+  - Ek: `GET /sap/systems` (T000 / CCCATEGORY: P/T/C) ve `GET /sap/{sid}/dumps/{dumpId}` (ST22 detay, AI analizi için).
+- [x] Okuma uçları (SAP'deki karşılıkları yorumda yazsın):
   - `GET /sap/{sid}/jobs?status=canceled` (SM37): JOBNAME, JOBCOUNT, STATUS, STRTDATE, user.
   - `GET /sap/{sid}/dumps?since=` (ST22): runtime error tipi (`TIME_OUT`, `DBSQL_DUPLICATE_KEY_ERROR`, `MESSAGE_TYPE_X`…), program, user, kısa metin.
   - `GET /sap/{sid}/users/locked` (SU01): BNAME, kilit nedeni (yanlış şifre / admin), zaman.
   - `GET /sap/{sid}/transports/queue` (STMS): TRKORR, sahibi, durum, return code (0/4/8/12).
   - `GET /sap/{sid}/certificates` (STRUST): PSE adı, bitiş tarihi.
   - `GET /sap/{sid}/workprocesses` (SM50): tip (DIA/BTC/UPD), toplam/meşgul.
-- [ ] Aksiyon uçları:
+- [x] Aksiyon uçları (idempotent; BAPIRET2 benzeri cevap):
   - `POST /sap/{sid}/users/{bname}/unlock` (BAPI_USER_UNLOCK karşılığı).
   - `POST /sap/{sid}/jobs/{jobname}/{jobcount}/restart`.
   - `POST /sap/{sid}/transports/{trkorr}/import`.
-- [ ] Veri, sabit bir seed ile gerçekçi ve tekrarlanabilir üretilsin. Zaman içinde yeni dump ve kilit olayları eklensin.
-- [ ] Chaos ayarı (`appsettings`): `FailurePercent` (503), `RateLimitPercent` (429 + Retry-After), `LatencyMs`.
-- [ ] SAP alan adları JSON'da büyük harf kalsın (BNAME, TRKORR). Domain'e sızmaması ACL'in işi.
+- [x] Veri, sabit bir seed ile gerçekçi ve tekrarlanabilir üretilsin. Zaman içinde yeni dump ve kilit olayları eklensin.
+- [x] Chaos ayarı (`appsettings`): `FailurePercent` (503), `RateLimitPercent` (429 + Retry-After), `LatencyMs`.
+- [x] SAP alan adları JSON'da büyük harf kalsın (BNAME, TRKORR). Domain'e sızmaması ACL'in işi.
 
 **Bitti sayılır:** `FakeSap.http` dosyasındaki isteklerin hepsi cevap veriyor. Chaos %100 yapılınca 503 dönüyor.
 **Commit:** `feat(fakesap): simulate SM37/ST22/SU01/STMS/STRUST/SM50 with chaos settings`

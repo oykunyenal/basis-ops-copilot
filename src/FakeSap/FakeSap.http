@@ -1,0 +1,47 @@
+# FakeSap requests. Run FakeSap (standalone or via the AppHost) and send them from VS Code / Rider / Visual Studio.
+@FakeSap = http://localhost:5090
+@sid = PRD
+
+### Landscape (T000 / STMS)
+GET {{FakeSap}}/sap/systems
+
+### SM37: canceled jobs (status: canceled | finished | active | released)
+# @name canceledJobs
+GET {{FakeSap}}/sap/{{sid}}/jobs?status=canceled
+
+### SM37: all jobs
+GET {{FakeSap}}/sap/{{sid}}/jobs
+
+### ST22: dumps of the last 24 hours
+# @name dumps
+GET {{FakeSap}}/sap/{{sid}}/dumps
+
+### ST22: dumps since a point in time
+GET {{FakeSap}}/sap/{{sid}}/dumps?since=2026-01-01T00:00:00Z
+
+### ST22: dump detail
+GET {{FakeSap}}/sap/{{sid}}/dumps/{{dumps.response.body.$[0].DUMPID}}
+
+### SU01: locked users
+GET {{FakeSap}}/sap/{{sid}}/users/locked
+
+### STMS: import queue
+GET {{FakeSap}}/sap/{{sid}}/transports/queue
+
+### STRUST: certificates
+GET {{FakeSap}}/sap/{{sid}}/certificates
+
+### SM50: work processes
+GET {{FakeSap}}/sap/{{sid}}/workprocesses
+
+### BAPI_USER_UNLOCK
+POST {{FakeSap}}/sap/{{sid}}/users/MEHMET/unlock
+
+### SM37 repeat scheduling: restart the first canceled job
+POST {{FakeSap}}/sap/{{sid}}/jobs/{{canceledJobs.response.body.$[0].JOBNAME}}/{{canceledJobs.response.body.$[0].JOBCOUNT}}/restart
+
+### STMS import (replace TRKORR with one from the import queue)
+POST {{FakeSap}}/sap/{{sid}}/transports/DEVK900100/import
+
+### Unknown system -> 404 ProblemDetails
+GET {{FakeSap}}/sap/XYZ/jobs
