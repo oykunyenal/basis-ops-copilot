@@ -16,6 +16,8 @@ internal static class ApiRoutes
         api.MapFindingEndpoints();
         api.MapActionEndpoints();
         api.MapAuditEndpoints();
+        api.MapDumpEndpoints();
+        api.MapReportEndpoints();
 
         return app;
     }

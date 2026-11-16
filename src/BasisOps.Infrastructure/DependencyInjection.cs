@@ -4,12 +4,14 @@ using BasisOps.Infrastructure.Persistence;
 using BasisOps.Infrastructure.Sap;
 using BasisOps.Infrastructure.Systems;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Http.Resilience;
 using Microsoft.Extensions.Options;
+using OllamaSharp;
 
 namespace BasisOps.Infrastructure;
 
@@ -17,6 +19,11 @@ public static class DependencyInjection
 {
     /// <summary>Name of the Aspire database resource and of the connection string.</summary>
     public const string DatabaseName = "basisops";
+
+    /// <summary>Activity source of the LLM calls (matched by the "BasisOps.*" tracing source in ServiceDefaults).</summary>
+    public const string AiTelemetrySource = "BasisOps.Ai";
+
+    private const string OllamaHttpClientName = "ollama";
 
     public static IHostApplicationBuilder AddInfrastructure(this IHostApplicationBuilder builder)
     {
@@ -37,8 +44,7 @@ public static class DependencyInjection
 
         services.AddSapGateway(builder.Configuration);
 
-        // Replaced by the Ollama analyzer in step 5.
-        services.TryAddSingleton<IAiAnalyzer, DisabledAiAnalyzer>();
+        services.AddAiAnalyzer(builder.Configuration);
 
         return builder;
     }
@@ -79,6 +85,45 @@ public static class DependencyInjection
         client.AddHttpMessageHandler<SapAttemptCounter>();
 
         return client;
+    }
+
+    /// <summary>
+    /// LLM analysis on the local Ollama server when <c>Ai:Enabled</c> is true; otherwise a disabled analyzer,
+    /// so reports are rule-based. One attempt per call with its own timeout: an LLM call is slow and not worth
+    /// retrying, and the default resilience handler (10 s per attempt) would cut every generation short.
+    /// </summary>
+    public static IServiceCollection AddAiAnalyzer(this IServiceCollection services, IConfiguration configuration)
+    {
+        var section = configuration.GetSection(AiOptions.SectionName);
+        services.AddOptions<AiOptions>()
+            .Bind(section)
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+
+        if (!section.GetValue<bool>(nameof(AiOptions.Enabled)))
+        {
+            services.TryAddSingleton<IAiAnalyzer, DisabledAiAnalyzer>();
+            return services;
+        }
+
+        var client = services.AddHttpClient(OllamaHttpClientName, (sp, http) =>
+        {
+            http.BaseAddress = sp.GetRequiredService<IOptions<AiOptions>>().Value.Endpoint;
+            http.Timeout = Timeout.InfiniteTimeSpan; // AiOptions.Timeout applies per call
+        });
+#pragma warning disable EXTEXP0001 // See AddSapGateway.
+        client.RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
+
+        services.AddChatClient(
+                sp => new OllamaApiClient(
+                    sp.GetRequiredService<IHttpClientFactory>().CreateClient(OllamaHttpClientName),
+                    sp.GetRequiredService<IOptions<AiOptions>>().Value.Model),
+                ServiceLifetime.Scoped)
+            .UseOpenTelemetry(sourceName: AiTelemetrySource); // prompts and answers are not recorded
+
+        services.AddScoped<IAiAnalyzer, OllamaAiAnalyzer>();
+        return services;
     }
 
     /// <summary>Applies pending EF Core migrations. Meant for local development; production runs a migration bundle.</summary>

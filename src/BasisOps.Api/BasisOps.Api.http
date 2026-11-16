@@ -91,5 +91,18 @@ X-Api-Key: {{apiKey}}
 GET {{baseUrl}}/api/v1/audit?target=PRD:MEHMET
 X-Api-Key: {{apiKey}}
 
+### Short dumps (ST22) of the last 24 hours
+# @name dumps
+GET {{baseUrl}}/api/v1/systems/PRD/dumps?hours=24
+X-Api-Key: {{apiKey}}
+
+### Analyse the newest dump with the local LLM (user names, hosts and IPs are masked first)
+POST {{baseUrl}}/api/v1/systems/PRD/dumps/{{dumps.response.body.$[0].id}}/analyze
+X-Api-Key: {{apiKey}}
+
+### Morning report: findings plus LLM summary (aiAvailable = false without Ollama)
+GET {{baseUrl}}/api/v1/reports/daily?sid=PRD
+X-Api-Key: {{apiKey}}
+
 ### Missing API key: 401
 GET {{baseUrl}}/api/v1/systems

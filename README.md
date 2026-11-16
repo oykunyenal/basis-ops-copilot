@@ -38,7 +38,8 @@ Dependencies point inward: `Domain ← Application ← Infrastructure ← Api / 
 
 ## Getting started
 
-Prerequisites: .NET 10 SDK, Docker.
+Prerequisites: .NET 10 SDK, Docker. Optional: [Ollama](https://ollama.com) with `qwen3:8b` for AI summaries
+(`ollama pull qwen3:8b`); without it every report is still returned, rule-based, with `aiAvailable: false`.
 
 ```bash
 dotnet build
@@ -52,6 +53,19 @@ dotnet run --project src/BasisOps.AppHost     # opens the Aspire dashboard
   `src/BasisOps.Api/http-client.private.env.json` (gitignored): `{ "local": { "apiKey": "..." } }`.
 - Actions are asynchronous: `POST /api/v1/actions` (with an `Idempotency-Key` header) returns `202 Accepted`,
   a second person approves, and the worker executes it.
+
+### Local LLM
+
+The Api talks to Ollama through `Microsoft.Extensions.AI` (`IChatClient`), configured under `Ai` in
+`src/BasisOps.Api/appsettings.json` (`Enabled`, `Endpoint`, `Model`, `Timeout`, `SummaryLanguage`).
+
+- **Masking:** user names, host names, IP and e-mail addresses become `USER_1`, `HOST_1`, `IP_1`, `EMAIL_1`
+  before any text reaches the model. Placeholders are not translated back.
+- **Prompt injection:** SAP text is wrapped in a `<sap_data>` block that the system prompt declares untrusted data;
+  tags inside the text are neutralised. Dump analysis uses a JSON schema and the answer is validated.
+- **Fallback:** if Ollama is down, slow or returns nothing usable, the endpoint still answers without AI.
+- Endpoints: `GET /api/v1/reports/daily?sid=PRD`, `GET /api/v1/systems/{sid}/dumps`,
+  `POST /api/v1/systems/{sid}/dumps/{dumpId}/analyze`.
 
 ### Security notes
 

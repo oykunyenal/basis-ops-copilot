@@ -101,8 +101,10 @@ internal sealed class FakeSapGateway : ISapGateway
 
     public Task<IReadOnlyList<ShortDump>> GetShortDumpsAsync(string sid, DateTimeOffset since, CancellationToken cancellationToken) => Return<ShortDump>(Dumps);
 
+    public Dictionary<string, ShortDumpDetail> DumpDetails { get; } = [];
+
     public Task<ShortDumpDetail?> GetShortDumpAsync(string sid, string dumpId, CancellationToken cancellationToken) =>
-        Task.FromResult<ShortDumpDetail?>(null);
+        Task.FromResult(DumpDetails.GetValueOrDefault(dumpId));
 
     public Task<IReadOnlyList<LockedUser>> GetLockedUsersAsync(string sid, CancellationToken cancellationToken) => Return<LockedUser>(LockedUsers);
 
@@ -139,8 +141,10 @@ internal sealed class FakeAiAnalyzer : IAiAnalyzer
 
     public string Summary { get; set; } = "PRD: 1 critical job cancellation, check Z_BILLING_DAILY first.";
 
+    public DumpAnalysis Analysis { get; set; } = new("Unselective SELECT on VBAP.", "Sales report fails.", ["Check ST05 trace"], ["ST05"]);
+
     public Task<DumpAnalysis> AnalyzeDumpAsync(ShortDumpDetail dump, CancellationToken cancellationToken) =>
-        throw new NotSupportedException();
+        Failure is null ? Task.FromResult(Analysis) : Task.FromException<DumpAnalysis>(Failure);
 
     public Task<string> SummarizeDailyAsync(string sid, IReadOnlyList<Finding> openFindings, CancellationToken cancellationToken) =>
         Failure is null ? Task.FromResult(Summary) : Task.FromException<string>(Failure);

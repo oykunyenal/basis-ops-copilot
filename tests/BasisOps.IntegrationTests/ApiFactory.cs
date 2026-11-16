@@ -43,6 +43,9 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Auth:ApiKey", ApiKey);
         builder.UseSetting("Database:MigrateOnStartup", "true");
 
+        // Tests never depend on a local Ollama; the fallback test points at a closed port instead.
+        builder.UseSetting("Ai:Enabled", "false");
+
         builder.ConfigureTestServices(services =>
         {
             services.RemoveAll<ISapGateway>();

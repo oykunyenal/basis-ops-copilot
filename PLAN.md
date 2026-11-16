@@ -216,14 +216,24 @@ Claude Code'a her adımda şunu söyle: *"PLAN.md'de Adım N'yi yap. Önce plan�
 **Commit:** `feat(worker): periodic health scan and approved action executor`
 
 ### Adım 5: AI (Ollama + Microsoft.Extensions.AI)
-- [ ] `IChatClient` kaydı: `OllamaSharp` paketi, model ve adres ayardan (`Ai:Endpoint=http://localhost:11434`, `Ai:Model=qwen3:8b`).
-- [ ] `OllamaAiAnalyzer : IAiAnalyzer`:
+- [x] `IChatClient` kaydı: `OllamaSharp` paketi, model ve adres ayardan (`Ai:Endpoint=http://localhost:11434`, `Ai:Model=qwen3:8b`).
+- [x] `OllamaAiAnalyzer : IAiAnalyzer`:
   - `AnalyzeDump(dump)`: olası neden, etki, Basis tarafında ilk adımlar, ilgili SAP işlem kodu. **JSON şemalı çıktı** (record'a parse edilir).
   - `SummarizeDaily(findings)`: 5–8 satır Türkçe yönetici özeti + öncelik sırası.
-- [ ] Modele gitmeden önce **maskeleme**: kullanıcı adları, host ve IP'ler → `USER_1`, `HOST_1`. Cevapta geri çevrilmez.
-- [ ] Prompt injection: dump metni "veri" olarak işaretlenir, talimat olarak görülmez (system prompt'ta açıkça yazılır).
-- [ ] **Fallback:** Ollama kapalıysa ya da timeout olursa rapor AI'sız (kural tabanlı liste) döner, hata fırlatmaz.
-- [ ] Api: `POST /dumps/{id}/analyze`, `GET /reports/daily?sid=PRD`.
+- [x] Modele gitmeden önce **maskeleme**: kullanıcı adları, host ve IP'ler → `USER_1`, `HOST_1`. Cevapta geri çevrilmez.
+- [x] Prompt injection: dump metni "veri" olarak işaretlenir, talimat olarak görülmez (system prompt'ta açıkça yazılır).
+- [x] **Fallback:** Ollama kapalıysa ya da timeout olursa rapor AI'sız (kural tabanlı liste) döner, hata fırlatmaz.
+- [x] Api: `POST /dumps/{id}/analyze`, `GET /reports/daily?sid=PRD`.
+
+- Notlar (uygulama sırasında):
+  - Paketler: `OllamaSharp` 5.5.2 + `Microsoft.Extensions.AI` 10.11.0 (11.0, runtime paketlerini 11'e çektiği için 10.x'te kalındı).
+  - Ollama HttpClient'ında ServiceDefaults'un resilience handler'ı kaldırıldı (10 sn deneme süresi her üretimi keserdi). Tek deneme, `Ai:Timeout` 2 dk (modelin soğuk yüklenmesi için).
+  - `think: false` (qwen3) ve JSON şemalı `format`, Ollama'ya giden istek gövdesi üzerinden testle doğrulandı.
+  - Maskeleme: bilinen değerler büyük/küçük harf duyarlı ve tam kelime (kullanıcı `CAN`, "canceled"i bozmaz); "user/owner X", "server X" kalıpları; IP, FQDN, e-posta. Bulgu `Key`'i (içinde kullanıcı adı var) modele gönderilmez. Tüm kuralların ürettiği bulgularla "sızıntı yok" testi var.
+  - Özet prompt'una kural tabanlı genel durum eklendi: model kritik bulgu varken "sistem sağlıklı" diyordu (canlı denemede görüldü).
+  - Uç değişikliği: dump id'si ST22'de sadece sistem içinde tekil, bu yüzden `POST /systems/{sid}/dumps/{dumpId}/analyze`; ek olarak `GET /systems/{sid}/dumps?hours=24`. Ollama yoksa dump analizi de `aiAvailable: false` ile döner.
+  - `Ai:Enabled` false ise (Worker, testler) `DisabledAiAnalyzer`. Integration testler Ollama'ya gitmez; fallback testi kapalı porta yönlenir.
+  - Canlı: PRD özeti ~13 sn, dump analizi ~7 sn (qwen3:8b, M serisi Mac).
 
 **Bitti sayılır:** Ollama açıkken günlük rapor özetli geliyor. Ollama kapatılınca (`ollama stop` / uygulamayı kapat) rapor yine geliyor, `aiAvailable: false` alanıyla.
 **Commit:** `feat(ai): dump analysis and daily summary with local LLM, masking and fallback`

@@ -1,6 +1,7 @@
 using BasisOps.Application.Abstractions;
 using BasisOps.Application.Actions;
 using BasisOps.Application.Audit;
+using BasisOps.Application.Dumps;
 using BasisOps.Application.Findings;
 using BasisOps.Application.Health;
 using BasisOps.Application.Reports;
@@ -31,6 +32,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<RequestActionCommand, RequestActionResult>, RequestActionHandler>();
         services.AddScoped<ICommandHandler<ApproveActionCommand, ActionRequestDto>, ApproveActionHandler>();
         services.AddScoped<ICommandHandler<RejectActionCommand, ActionRequestDto>, RejectActionHandler>();
+        services.AddScoped<ICommandHandler<AnalyzeDumpCommand, DumpAnalysisDto>, AnalyzeDumpHandler>();
 
         services.AddScoped<IQueryHandler<ListSystemsQuery, IReadOnlyList<SystemSummaryDto>>, ListSystemsHandler>();
         services.AddScoped<IQueryHandler<GetSystemHealthQuery, SystemHealthDto>, GetSystemHealthHandler>();
@@ -39,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<ListActionsQuery, IReadOnlyList<ActionRequestDto>>, ListActionsHandler>();
         services.AddScoped<IQueryHandler<GetAuditLogQuery, IReadOnlyList<AuditEntryDto>>, GetAuditLogHandler>();
         services.AddScoped<IQueryHandler<GetDailyReportQuery, DailyReportDto>, GetDailyReportHandler>();
+        services.AddScoped<IQueryHandler<ListDumpsQuery, IReadOnlyList<DumpDto>>, ListDumpsHandler>();
 
         return services;
     }

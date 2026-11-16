@@ -20,11 +20,14 @@ public sealed class StubSapGateway : ISapGateway
     public Task<IReadOnlyList<JobRun>> GetJobRunsAsync(string sid, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<JobRun>>([.. Jobs]);
 
+    /// <summary>Dumps by id (ST22), returned for every SID.</summary>
+    public ConcurrentDictionary<string, ShortDumpDetail> Dumps { get; } = new();
+
     public Task<IReadOnlyList<ShortDump>> GetShortDumpsAsync(string sid, DateTimeOffset since, CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<ShortDump>>([]);
+        Task.FromResult<IReadOnlyList<ShortDump>>([.. Dumps.Values.Select(d => d.Dump).Where(d => d.OccurredAt >= since)]);
 
     public Task<ShortDumpDetail?> GetShortDumpAsync(string sid, string dumpId, CancellationToken cancellationToken) =>
-        Task.FromResult<ShortDumpDetail?>(null);
+        Task.FromResult(Dumps.GetValueOrDefault(dumpId));
 
     public Task<IReadOnlyList<LockedUser>> GetLockedUsersAsync(string sid, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<LockedUser>>([.. LockedUsers]);
