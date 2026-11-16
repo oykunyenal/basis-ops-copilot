@@ -46,6 +46,13 @@ internal sealed class InMemoryStore :
     Task<IReadOnlyList<ActionRequest>> IActionRequestRepository.ListAsync(ActionStatus? status, int limit, CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<ActionRequest>>(Actions.Where(a => status is null || a.Status == status).Take(limit).ToList());
 
+    Task<ActionRequest?> IActionRequestRepository.LockNextDueAsync(DateTimeOffset now, DateTimeOffset staleExecutingBefore, CancellationToken cancellationToken) =>
+        Task.FromResult(Actions
+            .Where(a => (a.Status == ActionStatus.Approved && (a.NextAttemptAt is null || a.NextAttemptAt <= now))
+                || (a.Status == ActionStatus.Executing && a.UpdatedAt < staleExecutingBefore))
+            .OrderBy(a => a.NextAttemptAt ?? a.UpdatedAt)
+            .FirstOrDefault());
+
     void IActionRequestRepository.Add(ActionRequest request) => Actions.Add(request);
 
     Task<HealthScan?> IHealthScanRepository.GetLatestAsync(string sid, CancellationToken cancellationToken) =>
@@ -63,6 +70,9 @@ internal sealed class InMemoryStore :
         SaveCount++;
         return Task.CompletedTask;
     }
+
+    Task IUnitOfWork.ExecuteInTransactionAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken) =>
+        operation(cancellationToken);
 
     Task<IReadOnlyList<SapSystem>> ISystemRegistry.ListAsync(CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyList<SapSystem>>(Systems);
@@ -82,6 +92,11 @@ internal sealed class FakeSapGateway : ISapGateway
 
     public bool Unavailable { get; set; }
 
+    /// <summary>Result of every action call; set to throw to simulate SAP failures.</summary>
+    public Func<SapActionOutcome> ActionResult { get; set; } = () => new SapActionOutcome(SapActionStatus.Succeeded, "done");
+
+    public List<string> ActionCalls { get; } = [];
+
     public Task<IReadOnlyList<JobRun>> GetJobRunsAsync(string sid, CancellationToken cancellationToken) => Return<JobRun>(Jobs);
 
     public Task<IReadOnlyList<ShortDump>> GetShortDumpsAsync(string sid, DateTimeOffset since, CancellationToken cancellationToken) => Return<ShortDump>(Dumps);
@@ -97,11 +112,20 @@ internal sealed class FakeSapGateway : ISapGateway
 
     public Task<IReadOnlyList<WorkProcessUsage>> GetWorkProcessUsageAsync(string sid, CancellationToken cancellationToken) => Return<WorkProcessUsage>([]);
 
-    public Task<SapActionOutcome> UnlockUserAsync(string sid, string userName, CancellationToken cancellationToken) => throw new NotSupportedException();
+    public Task<SapActionOutcome> UnlockUserAsync(string sid, string userName, CancellationToken cancellationToken) =>
+        Act($"unlock {sid} {userName}");
 
-    public Task<SapActionOutcome> RestartJobAsync(string sid, string jobName, string runId, CancellationToken cancellationToken) => throw new NotSupportedException();
+    public Task<SapActionOutcome> RestartJobAsync(string sid, string jobName, string runId, CancellationToken cancellationToken) =>
+        Act($"restart {sid} {jobName} {runId}");
 
-    public Task<SapActionOutcome> ImportTransportAsync(string sid, string transportNumber, CancellationToken cancellationToken) => throw new NotSupportedException();
+    public Task<SapActionOutcome> ImportTransportAsync(string sid, string transportNumber, CancellationToken cancellationToken) =>
+        Act($"import {sid} {transportNumber}");
+
+    private Task<SapActionOutcome> Act(string call)
+    {
+        ActionCalls.Add(call);
+        return Task.FromResult(ActionResult());
+    }
 
     private Task<IReadOnlyList<T>> Return<T>(List<T> items) =>
         Unavailable

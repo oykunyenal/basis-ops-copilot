@@ -28,7 +28,7 @@ public enum ActionStatus
 /// <code>
 /// Requested → Approved → Executing → Succeeded
 ///           ↘ Rejected             ↘ Failed
-///                       Executing → Approved (transient error, retry scheduled)
+///                       Executing → Approved (transient error: retry scheduled; or deferred without counting)
 /// </code>
 /// Every transition returns the audit entry that records it.
 /// </summary>
@@ -193,6 +193,8 @@ public sealed class ActionRequest
         ArgumentException.ThrowIfNullOrWhiteSpace(error);
         ArgumentOutOfRangeException.ThrowIfLessThan(maxAttempts, 1);
 
+        // Executing -> Approved is only a retry; it must never stand in for a human approval.
+        EnsureStatus(ActionStatus.Executing, transient && Attempts < maxAttempts ? ActionStatus.Approved : ActionStatus.Failed);
         LastError = error;
 
         if (transient && Attempts < maxAttempts)
@@ -205,6 +207,21 @@ public sealed class ActionRequest
         var previous = TransitionTo(ActionStatus.Failed, now);
         var why = transient ? $"Gave up after {Attempts} attempts: {error}" : $"Permanent error: {error}";
         return Audit(now, ExecutorActor, "ActionFailed", previous, why);
+    }
+
+    /// <summary>
+    /// The attempt never reached SAP (e.g. the circuit breaker is open), so it does not count:
+    /// the request goes back to <see cref="ActionStatus.Approved"/> and waits until <paramref name="nextAttemptAt"/>.
+    /// </summary>
+    public AuditEntry Defer(string reason, DateTimeOffset nextAttemptAt, DateTimeOffset now)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(reason);
+        EnsureStatus(ActionStatus.Executing, ActionStatus.Approved);
+
+        var from = TransitionTo(ActionStatus.Approved, now);
+        Attempts--;
+        NextAttemptAt = nextAttemptAt;
+        return Audit(now, ExecutorActor, "ActionDeferred", from, reason);
     }
 
     public bool HasSameContentAs(ActionType type, string sid, string target, string requestedBy) =>
@@ -252,6 +269,14 @@ public sealed class ActionRequest
 
     private static bool IsSamePerson(string a, string b) =>
         string.Equals(a.Trim(), b.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    private void EnsureStatus(ActionStatus required, ActionStatus next)
+    {
+        if (Status != required)
+        {
+            throw new InvalidStateTransitionException(nameof(ActionRequest), Status.ToString(), next.ToString());
+        }
+    }
 
     private ActionStatus TransitionTo(ActionStatus next, DateTimeOffset now)
     {

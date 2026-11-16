@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using BasisOps.Application.Abstractions;
 using BasisOps.Application.Ports;
 using BasisOps.Domain.Findings;
@@ -34,6 +35,9 @@ public sealed partial class RunHealthScanHandler(
             return Error.NotFound("system_not_found", $"System {command.Sid} is not managed.");
         }
 
+        using var activity = Telemetry.Source.StartActivity("health-scan");
+        activity?.SetTag("sap.sid", system.Sid);
+
         var startedAt = timeProvider.GetUtcNow();
 
         SystemSnapshot snapshot;
@@ -45,6 +49,7 @@ public sealed partial class RunHealthScanHandler(
         {
             // A failed scan is recorded, not thrown: findings stay as they are until SAP answers again.
             LogScanFailed(system.Sid, ex.Message);
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             var failed = HealthScan.Failed(system.Sid, startedAt, timeProvider.GetUtcNow(), ex.Message);
             scans.Add(failed);
             await unitOfWork.SaveChangesAsync(cancellationToken);
@@ -60,6 +65,8 @@ public sealed partial class RunHealthScanHandler(
         scans.Add(scan);
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
+        activity?.SetTag("findings.opened", result.Opened.Count);
+        activity?.SetTag("findings.resolved", result.Resolved.Count);
         LogScanCompleted(system.Sid, result.Opened.Count, result.Updated.Count, result.Resolved.Count);
         return new HealthScanResult(scan.Id, system.Sid, scan.Status, result.Opened.Count, result.Updated.Count, result.Resolved.Count, null);
     }

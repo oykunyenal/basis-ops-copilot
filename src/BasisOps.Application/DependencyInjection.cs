@@ -24,6 +24,9 @@ public static class DependencyInjection
         services.AddSingleton<IHealthRule>(new WorkProcessUtilizationRule());
         services.AddSingleton<IHealthRule>(new LockedUserRule());
 
+        services.AddOptions<ActionExecutorOptions>();
+        services.AddScoped<ActionExecutor>();
+
         services.AddScoped<ICommandHandler<RunHealthScanCommand, HealthScanResult>, RunHealthScanHandler>();
         services.AddScoped<ICommandHandler<RequestActionCommand, RequestActionResult>, RequestActionHandler>();
         services.AddScoped<ICommandHandler<ApproveActionCommand, ActionRequestDto>, ApproveActionHandler>();

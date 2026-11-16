@@ -124,6 +124,20 @@ public class SapGatewayContractTests(FakeSapFactory fakeSap) : IClassFixture<Fak
         Assert.Equal(requestsBeforeOpen, sap.Requests);
     }
 
+    [Fact]
+    public async Task GetJobRuns_CircuitOpensDuringRetries_ReportsFailureNotSkippedCall()
+    {
+        // Two attempts reach SAP and fail, the breaker opens, the third attempt is short-circuited.
+        // The call did reach SAP, so the executor must count it as an attempt.
+        using var failing = fakeSap.WithWebHostBuilder(b => b.UseSetting("Chaos:FailurePercent", "100"));
+        using var sap = CreateGateway(failing, maxRetryAttempts: 2, circuitMinimumThroughput: 2);
+
+        var ex = await Assert.ThrowsAsync<SapUnavailableException>(() => sap.Gateway.GetJobRunsAsync("PRD", Ct));
+
+        Assert.Equal(2, sap.Requests);
+        Assert.False(ex.IsCircuitOpen);
+    }
+
     private static GatewayUnderTest CreateGateway(
         WebApplicationFactory<Program> server, int maxRetryAttempts = 3, int circuitMinimumThroughput = 10)
     {

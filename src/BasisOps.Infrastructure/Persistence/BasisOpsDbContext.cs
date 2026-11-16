@@ -38,6 +38,20 @@ public sealed class BasisOpsDbContext(DbContextOptions<BasisOpsDbContext> option
         }
     }
 
+    async Task IUnitOfWork.ExecuteInTransactionAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken)
+    {
+        // The retrying execution strategy (enabled by Aspire) requires user transactions to run inside it.
+        var strategy = Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async ct =>
+        {
+            // A retry starts from what is in the database, not from changes of the failed try.
+            ChangeTracker.Clear();
+            await using var transaction = await Database.BeginTransactionAsync(ct);
+            await operation(ct);
+            await transaction.CommitAsync(ct);
+        }, cancellationToken);
+    }
+
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)
     {
         // Enums are stored as text: readable in SQL and safe against reordering.

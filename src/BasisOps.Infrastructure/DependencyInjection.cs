@@ -54,6 +54,7 @@ public static class DependencyInjection
             .ValidateDataAnnotations()
             .ValidateOnStart();
 
+        services.AddTransient<SapAttemptCounter>();
         var client = services.AddHttpClient<ISapGateway, FakeSapGateway>((sp, http) =>
             http.BaseAddress = sp.GetRequiredService<IOptions<SapGatewayOptions>>().Value.BaseAddress);
 
@@ -73,6 +74,9 @@ public static class DependencyInjection
                 resilience.CircuitBreaker.MinimumThroughput = sap.CircuitMinimumThroughput;
                 resilience.CircuitBreaker.SamplingDuration = TimeSpan.FromTicks(Math.Max(TimeSpan.FromSeconds(30).Ticks, sap.AttemptTimeout.Ticks * 2));
             });
+
+        // Added after the resilience handler, so it runs once per attempt that is actually sent.
+        client.AddHttpMessageHandler<SapAttemptCounter>();
 
         return client;
     }

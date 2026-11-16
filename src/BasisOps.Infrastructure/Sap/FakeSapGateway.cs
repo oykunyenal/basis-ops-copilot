@@ -90,13 +90,19 @@ internal sealed class FakeSapGateway(HttpClient http) : ISapGateway
     private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(method, path);
+        var sent = SapAttemptCounter.Begin();
         try
         {
             return await http.SendAsync(request, cancellationToken);
         }
-        catch (BrokenCircuitException ex)
+        catch (BrokenCircuitException ex) when (sent.Value == 0)
         {
             throw new SapUnavailableException("SAP calls are paused because the circuit breaker is open.", isCircuitOpen: true, ex);
+        }
+        catch (BrokenCircuitException ex)
+        {
+            // A request reached SAP and failed; the breaker opened before the retries were used up.
+            throw new SapUnavailableException("SAP failed and the circuit breaker opened.", innerException: ex);
         }
         catch (TimeoutRejectedException ex)
         {

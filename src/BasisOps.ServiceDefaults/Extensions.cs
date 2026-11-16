@@ -62,6 +62,7 @@ public static class Extensions
             .WithTracing(tracing =>
             {
                 tracing.AddSource(builder.Environment.ApplicationName)
+                    .AddSource("BasisOps.*")
                     .AddAspNetCoreInstrumentation(tracing =>
                         // Exclude health check requests from tracing
                         tracing.Filter = context =>

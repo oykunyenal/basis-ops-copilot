@@ -193,14 +193,24 @@ Claude Code'a her adımda şunu söyle: *"PLAN.md'de Adım N'yi yap. Önce plan�
 **Commit:** `feat(api): findings and approval-based actions with idempotency`
 
 ### Adım 4: Worker
-- [ ] `HealthScanWorker`: `PeriodicTimer` ile her sistem için tarama (ayar: `ScanIntervalSeconds`, varsayılan 60).
+- [x] `HealthScanWorker`: `PeriodicTimer` ile her sistem için tarama (ayar: `ScanIntervalSeconds`, varsayılan 60).
   - Bulgu varsa `LastSeen` güncellenir, yoksa yenisi açılır, kaybolan bulgu `Resolved` olur.
-- [ ] `ActionExecutorWorker`:
+- [x] `ActionExecutorWorker`:
   - `Approved` aksiyonları `FOR UPDATE SKIP LOCKED` ile alır, FakeSap'e uygular.
   - Geçici hatada `Attempts++` ve backoff ile tekrar dener. `MaxAttempts` (5) aşılırsa `Failed` olur ve audit + log'a "alarm" yazar.
   - Circuit breaker açıkken denemeyi sayma, bekle.
-- [ ] Her worker DbContext'i scope içinde kullanır (captive dependency yok, `IServiceScopeFactory`).
-- [ ] Log'larda correlation: aksiyon id'si ve sid structured log alanı olarak geçer.
+- [x] Her worker DbContext'i scope içinde kullanır (captive dependency yok, `IServiceScopeFactory`).
+- [x] Log'larda correlation: aksiyon id'si ve sid structured log alanı olarak geçer.
+
+- Notlar (uygulama sırasında):
+  - Yürütme mantığı Application'da (`ActionExecutor`); Worker sadece döngü. Aksiyon kısa bir transaction içinde `FOR UPDATE SKIP LOCKED` ile alınıp `Executing` yapılır, SAP çağrısı kilit dışında yapılır.
+  - Lease: `Executing`'de `ExecutionLease`'ten (2 dk) uzun kalan aksiyon (executor çöktü) kesintiye uğramış deneme sayılıp tekrar denenir. SAP aksiyonları idempotent olduğu için güvenli.
+  - Devre açıkken `ActionRequest.Defer` (deneme sayılmaz). Gateway, çağrı sırasında SAP'ye gerçekten istek gittiyse "devre açık" demez: aksi halde kalıcı kesintide aksiyon hiç `Failed` olmuyordu (canlı chaos %100 testinde bulundu).
+  - Backoff: 5 sn × 2^(deneme−1), en fazla 2 dk, ±%20 jitter. `MaxAttempts` aşılınca `Failed` + `LogCritical` "ALARM".
+  - Domain düzeltmesi: `RecordFailure`/`Defer` sadece `Executing`'den çağrılabilir (yoksa `Requested → Approved` onaysız geçiş olabiliyordu).
+  - Trace: `BasisOps.Application` kaynağı (`health-scan`, `execute-action` span'leri). Worker, migration için `WaitFor(api)`.
+  - Canlı doğrulama: chaos %50 → aksiyonlar `Succeeded` (HTTP retry'ları absorbe etti); %100 → 5 denemede `Failed` + ALARM.
+  - Adım 7'den öne alınan testler: talep → onay → yürütme → Succeeded, 4 paralel executor'da her aksiyon tek kez (SKIP LOCKED), lease kurtarma.
 
 **Bitti sayılır:** Aspire dashboard'da tarama trace'leri görünüyor. FakeSap chaos %50 iken onaylı aksiyonlar retry ile sonunda `Succeeded` oluyor. %100 iken `Failed` oluyor.
 **Commit:** `feat(worker): periodic health scan and approved action executor`

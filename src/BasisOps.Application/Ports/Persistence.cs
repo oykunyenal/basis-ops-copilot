@@ -25,6 +25,14 @@ public interface IActionRequestRepository
 
     Task<IReadOnlyList<ActionRequest>> ListAsync(ActionStatus? status, int limit, CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Locks the next action the executor should work on and skips rows locked by other executors
+    /// (<c>FOR UPDATE SKIP LOCKED</c>): an approved action that is due, or one stuck in Executing since
+    /// before <paramref name="staleExecutingBefore"/> (its executor died). Call inside
+    /// <see cref="IUnitOfWork.ExecuteInTransactionAsync"/>; the lock is held until the transaction ends.
+    /// </summary>
+    Task<ActionRequest?> LockNextDueAsync(DateTimeOffset now, DateTimeOffset staleExecutingBefore, CancellationToken cancellationToken);
+
     void Add(ActionRequest request);
 }
 
@@ -45,4 +53,10 @@ public interface IAuditLog
 public interface IUnitOfWork
 {
     Task SaveChangesAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Runs <paramref name="operation"/> in a database transaction. The operation may run more than once
+    /// (transient database errors are retried), so it must start from a clean state and be safe to repeat.
+    /// </summary>
+    Task ExecuteInTransactionAsync(Func<CancellationToken, Task> operation, CancellationToken cancellationToken);
 }

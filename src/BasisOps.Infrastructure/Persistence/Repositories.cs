@@ -67,6 +67,22 @@ internal sealed class ActionRequestRepository(BasisOpsDbContext db) : IActionReq
         return await query.OrderByDescending(a => a.RequestedAt).ThenByDescending(a => a.Id).Take(limit).ToListAsync(cancellationToken);
     }
 
+    public async Task<ActionRequest?> LockNextDueAsync(DateTimeOffset now, DateTimeOffset staleExecutingBefore, CancellationToken cancellationToken)
+    {
+        // xmin is a system column and not part of "*"; EF needs it for the concurrency token.
+        var rows = await db.ActionRequests.FromSql($"""
+                SELECT *, xmin FROM action_requests
+                WHERE (status = {nameof(ActionStatus.Approved)} AND (next_attempt_at IS NULL OR next_attempt_at <= {now}))
+                   OR (status = {nameof(ActionStatus.Executing)} AND updated_at < {staleExecutingBefore})
+                ORDER BY COALESCE(next_attempt_at, updated_at), id
+                LIMIT 1
+                FOR UPDATE SKIP LOCKED
+                """)
+            .ToListAsync(cancellationToken);
+
+        return rows.SingleOrDefault();
+    }
+
     public void Add(ActionRequest request) => db.ActionRequests.Add(request);
 }
 

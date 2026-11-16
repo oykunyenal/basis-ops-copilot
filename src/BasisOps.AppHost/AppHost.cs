@@ -15,7 +15,7 @@ var fakeSap = builder.AddProject<Projects.FakeSap>("fakesap")
     .WithEndpoint("http", e => e.Port = 5090);
 
 // The n8n container reaches the Api at http://host.docker.internal:5081, so the port is fixed.
-builder.AddProject<Projects.BasisOps_Api>("api")
+var api = builder.AddProject<Projects.BasisOps_Api>("api")
     .WithEndpoint("http", e => e.Port = 5081)
     .WithEnvironment("Auth__ApiKey", apiKey)
     .WithReference(db)
@@ -25,7 +25,7 @@ builder.AddProject<Projects.BasisOps_Api>("api")
 builder.AddProject<Projects.BasisOps_Worker>("worker")
     .WithReference(db)
     .WithReference(fakeSap)
-    .WaitFor(db)
-    .WaitFor(fakeSap);
+    .WaitFor(fakeSap)
+    .WaitFor(api); // the Api applies the EF Core migrations on start
 
 builder.Build().Run();

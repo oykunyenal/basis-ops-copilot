@@ -142,6 +142,38 @@ public class ActionRequestTests
         Assert.Throws<InvalidOperationException>(() => request.StartExecution(Now.AddSeconds(10)));
     }
 
+    [Fact]
+    public void Defer_Executing_ReturnsToApprovedWithoutCountingAttempt()
+    {
+        var request = ApprovedRequest();
+        request.StartExecution(Now);
+
+        var audit = request.Defer("Circuit breaker is open.", Now.AddSeconds(15), Now);
+
+        Assert.Equal(ActionStatus.Approved, request.Status);
+        Assert.Equal(0, request.Attempts);
+        Assert.Equal(Now.AddSeconds(15), request.NextAttemptAt);
+        Assert.Equal("ActionDeferred", audit.Action);
+    }
+
+    [Fact]
+    public void RecordFailure_RequestedAction_ThrowsAndDoesNotApprove()
+    {
+        var request = NewRequest();
+
+        Assert.Throws<InvalidStateTransitionException>(() =>
+            request.RecordFailure("503", transient: true, maxAttempts: 5, TimeSpan.Zero, Now));
+        Assert.Equal(ActionStatus.Requested, request.Status);
+    }
+
+    [Fact]
+    public void Defer_NotExecuting_ThrowsInvalidStateTransition()
+    {
+        var request = NewRequest();
+
+        Assert.Throws<InvalidStateTransitionException>(() => request.Defer("circuit open", Now, Now));
+    }
+
     [Theory]
     [InlineData(ActionType.UnlockUser, "MEHMET", true)]
     [InlineData(ActionType.UnlockUser, "A_VERY_LONG_USER", false)]
