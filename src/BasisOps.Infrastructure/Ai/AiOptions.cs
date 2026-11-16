@@ -23,9 +23,9 @@ public sealed class AiOptions
     [Range(typeof(TimeSpan), "00:00:01", "00:10:00")]
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(120);
 
-    /// <summary>Language of the daily summary written for people. Prompts themselves are in English.</summary>
+    /// <summary>Language of the daily summary written for people, for example "English" or "German". Prompts are always English.</summary>
     [Required]
-    public string SummaryLanguage { get; set; } = "Turkish";
+    public string SummaryLanguage { get; set; } = "English";
 
     /// <summary>The daily summary prompt lists at most this many findings (most severe first).</summary>
     [Range(1, 500)]

@@ -1,312 +1,342 @@
-# Basis Ops Copilot: Yapılacaklar
+# Basis Ops Copilot: Roadmap
 
-SAP Basis ekiplerinin her gün elle yaptığı işleri otomatikleştiren, local çalışan bir .NET + n8n + yerel LLM projesi.
-Hem portfolyo (GitHub) hem de teknik mülakatta anlatılacak somut örnek.
+A locally running .NET + n8n + local LLM project that automates the work SAP Basis teams do by hand every day.
+It is both a portfolio project and a concrete example to walk through in technical interviews.
 
-## 1. Sorun ve çözüm
+## 1. Problem and solution
 
-**Sorun:** Basis ekibi her sabah aynı kontrolleri elle yapar ve gün içinde aynı talepleri tekrar tekrar karşılar.
+**Problem:** every morning the Basis team runs the same checks by hand, and during the day it handles the same user requests again and again.
 
-| Elle yapılan iş | SAP'de nerede | Bu projede |
+| Manual task | Where in SAP | In this project |
 |---|---|---|
-| İptal olan arka plan job'ları | SM37 | Otomatik tarama + bulgu |
-| Kısa dump'lar (ABAP runtime error) | ST22 | Tarama + AI ile analiz |
-| Kilitlenen kullanıcılar | SU01 | Tarama + self-servis kilit açma (onaylı) |
-| Transport kuyruğu, hatalı import | STMS | Tarama + onaylı import |
-| Süresi dolacak sertifikalar | STRUST | Tarama + uyarı |
-| Work process doluluğu | SM50 / SM66 | Tarama + eşik uyarısı |
+| Canceled background jobs | SM37 | Automatic scan + finding |
+| Short dumps (ABAP runtime errors) | ST22 | Scan + AI-assisted analysis |
+| Locked users | SU01 | Scan + self-service unlock (with approval) |
+| Transport queue, failed imports | STMS | Scan + approved import |
+| Expiring certificates | STRUST | Scan + warning |
+| Work process utilization | SM50 / SM66 | Scan + threshold alert |
 
-**Çözüm:**
-1. Worker sistemi periyodik tarar, kurallara göre bulgu üretir.
-2. Yerel LLM her sabah bulguları özetler, n8n raporu Telegram'a gönderir.
-3. Kullanıcı sohbetten "kullanıcım kilitlendi" der, AI talebi oluşturur, insan onaylar, sistem uygular. Her adım audit log'a yazılır.
+**Solution:**
+1. The worker scans the systems periodically and turns rule violations into findings.
+2. Every morning the local LLM summarizes the findings and n8n sends the report to Telegram.
+3. A user writes "my user is locked" in a chat; the AI opens a request, a person approves it, the system applies it.
+   Every step is written to the audit log.
 
-> **Dürüstlük notu:** Gerçek SAP'ye erişim yok. `FakeSap` servisi SAP'yi taklit eder.
-> Kod bir `ISapGateway` arayüzü üzerinden konuşur. Gerçekte bu arayüzün arkasına **SAP .NET Connector (NCo) ile RFC/BAPI**
-> (`BAPI_USER_UNLOCK`, `BAPI_XBP_JOB_*`, `TMS_*`) ya da SAP OData servisleri takılır. README'de ve mülakatta bu açıkça söylenir.
+> **Honesty note:** there is no access to a real SAP system. The `FakeSap` service simulates one.
+> The code talks to it through the `ISapGateway` interface. In a real landscape, the **SAP .NET Connector (NCo) with RFC/BAPI**
+> (`BAPI_USER_UNLOCK`, `BAPI_XBP_JOB_*`, `TMS_*`) or SAP OData services plug in behind that interface. The README says so openly.
 
-## 2. Mimari
+## 2. Architecture
 
 ```
                        ┌──────────────── Aspire AppHost (dotnet run) ─────────────────┐
                        │                                                              │
-  n8n (mevcut, :5678) ─┼─HTTP─► BasisOps.Api (:5081) ──► PostgreSQL (Aspire container)│
+  n8n (existing, :5678)┼─HTTP─► BasisOps.Api (:5081) ──► PostgreSQL (Aspire container)│
    ▲  Schedule/Chat    │            ▲                        ▲                        │
-   │  Telegram         │            │ aynı DB                │                        │
+   │  Telegram         │            │ same database          │                        │
    │                   │      BasisOps.Worker ───────────────┘                        │
-   │                   │        │ tarama + onaylı aksiyonları uygular                 │
+   │                   │        │ scans + executes approved actions                   │
    │                   │        ▼                                                     │
-   │                   │      FakeSap (:5090)  ← SM37/ST22/SU01/STMS/STRUST/SM50 taklidi│
+   │                   │      FakeSap (:5090)  ← simulates SM37/ST22/SU01/STMS/STRUST/SM50│
    │                   └──────────────────────────────────────────────────────────────┘
-   └──── Ollama (mevcut, native, :11434, qwen3) ◄── Api (Microsoft.Extensions.AI)
+   └──── Ollama (existing, native, :11434, qwen3) ◄── Api (Microsoft.Extensions.AI)
 ```
 
-- **n8n ve Ollama tekrar kurulmaz.** `~/ai-assistant` içindeki mevcut kurulum kullanılır.
-  - n8n container'dan API'ye adres: `http://host.docker.internal:5081`
-  - Api'den Ollama'ya adres: `http://localhost:11434`
-- Aspire sadece projenin kendi parçalarını kaldırır: Postgres, FakeSap, Api, Worker. Dashboard'da log, trace ve metrikler görünür.
+- **n8n and Ollama are not installed by this project**; an existing installation is used.
+  - From the n8n container to the Api: `http://host.docker.internal:5081`
+  - From the Api to Ollama: `http://localhost:11434`
+- Aspire only runs the project's own parts: Postgres, FakeSap, Api, Worker. Logs, traces and metrics show up in the dashboard.
 
-### Klasör yapısı
+### Folder structure
 
 ```
 basis-ops-copilot/
 ├── BasisOps.slnx
 ├── src/
-│   ├── BasisOps.AppHost/            Aspire orkestrasyonu
-│   ├── BasisOps.ServiceDefaults/    OpenTelemetry, health check, resilience (Aspire şablonu)
-│   ├── BasisOps.Domain/             Entity'ler, kurallar, durum makinesi. Hiçbir pakete bağlı değil
-│   ├── BasisOps.Application/        Use case'ler (CQRS handler'ları), portlar (ISapGateway, IAiAnalyzer)
-│   ├── BasisOps.Infrastructure/     EF Core + Npgsql, FakeSapGateway (HttpClient), OllamaAnalyzer
+│   ├── BasisOps.AppHost/            Aspire orchestration
+│   ├── BasisOps.ServiceDefaults/    OpenTelemetry, health checks, resilience (Aspire template)
+│   ├── BasisOps.Domain/             Entities, rules, state machine. No package dependencies
+│   ├── BasisOps.Application/        Use cases (command / query handlers), ports (ISapGateway, IAiAnalyzer)
+│   ├── BasisOps.Infrastructure/     EF Core + Npgsql, SAP gateway (HttpClient), Ollama analyzer
 │   ├── BasisOps.Api/                Minimal API, /api/v1
-│   ├── BasisOps.Worker/             Tarama + aksiyon yürütücü (BackgroundService)
-│   └── FakeSap/                     SAP taklidi, hata enjeksiyonu (chaos) ayarlı
+│   ├── BasisOps.Worker/             Health scan + action executor (BackgroundService)
+│   └── FakeSap/                     SAP simulator with fault injection (chaos settings)
 ├── tests/
-│   ├── BasisOps.UnitTests/          Kurallar, durum makinesi
-│   └── BasisOps.IntegrationTests/   Testcontainers (Postgres) + WebApplicationFactory
-├── n8n/workflows/                   Export edilmiş workflow JSON'ları
+│   ├── BasisOps.UnitTests/          Rules, state machine, masking, prompts
+│   ├── BasisOps.IntegrationTests/   Testcontainers (Postgres) + WebApplicationFactory
+│   └── FakeSap.Tests/               Gateway contract tests against the simulator
+├── n8n/workflows/                   Exported workflow JSON files
 ├── docs/
 │   ├── architecture.md
-│   ├── interview-notes.md           Mülakatta anlatılacaklar
-│   └── runbooks/                    Basis runbook'ları (n8n RAG için)
+│   └── interview-notes.md           Talking points and likely questions
 └── .github/workflows/ci.yml
 ```
 
-### Temel kararlar (README'de "Neden?" bölümü olacak)
+### Key decisions (the README has a "Why" section)
 
-| Karar | Neden |
+| Decision | Why |
 |---|---|
-| Clean / Onion katmanlar | Domain SAP'den ve veritabanından bağımsız; FakeSap gerçek SAP ile değişebilir |
-| CQRS, **MediatR'sız** | MediatR 2025'te ticari lisansa geçti. Basit `ICommandHandler<T>` / `IQueryHandler<T,R>` arayüzleri yeterli |
-| `ISapGateway` = anti-corruption layer | SAP'nin terimleri (BNAME, JOBNAME, TRKORR) domain'e sızmaz |
-| Aksiyonlar = onaylı durum makinesi | Prod sistemde AI ya da otomasyon tek başına değişiklik yapmaz; insan onaylar |
-| Aksiyon tablosu kuyruk olarak (`FOR UPDATE SKIP LOCKED`) | Ayrı mesaj kuyruğu kurmadan güvenli, çoklu worker'a uygun iş dağıtımı |
-| Idempotency-Key | n8n ya da istemci aynı talebi iki kez gönderirse tek aksiyon oluşur |
-| Yerel LLM (Ollama) | Müşteri verisi dışarı çıkmaz, maliyet sıfır |
-| LLM öncesi maskeleme | Kullanıcı adları ve hostlar modele gitmeden maskelenir (`USER_1`, `HOST_1`) |
+| Clean / onion layers | The domain is independent of SAP and the database; FakeSap can be swapped for real SAP |
+| Commands and queries **without MediatR** | MediatR moved to a commercial license in 2025. Simple `ICommandHandler<T>` / `IQueryHandler<T,R>` interfaces are enough |
+| `ISapGateway` = anti-corruption layer | SAP terms (BNAME, JOBNAME, TRKORR) do not leak into the domain |
+| Actions = approval-based state machine | On production, neither automation nor AI changes anything on its own; a person approves |
+| Action table as queue (`FOR UPDATE SKIP LOCKED`) | Safe work distribution for several workers without a separate message broker |
+| Idempotency-Key | If n8n or a client sends the same request twice, only one action is created |
+| Local LLM (Ollama) | Customer data does not leave the machine, no cost |
+| Masking before the LLM | User names and hosts are masked before they reach the model (`USER_1`, `HOST_1`) |
 
-## 3. Ön koşullar (Mac)
+## 3. Prerequisites (macOS)
 
 ```bash
-dotnet --list-sdks          # .NET 10 SDK olmalı
-docker info                 # Docker Desktop / OrbStack çalışıyor olmalı
-ollama list                 # qwen3 modeli var mı
-curl -s localhost:5678 >/dev/null && echo "n8n ayakta"
+dotnet --list-sdks          # .NET 10 SDK
+docker info                 # Docker Desktop / OrbStack running
+ollama list                 # qwen3:8b pulled
+curl -s localhost:5678 >/dev/null && echo "n8n is up"
 ```
 
-- Aspire şablonları: `dotnet new install Aspire.ProjectTemplates` (Claude Code güncel kurulum yöntemini kontrol etsin).
-- GitHub'da boş bir `basis-ops-copilot` reposu aç (README eklemeden). Push'u sen yapacaksın.
+- Create an empty GitHub repository `basis-ops-copilot` (without a README). The user pushes.
 
-## 4. Adım adım yapılacaklar
+## 4. Steps
 
-Her adım ayrı bir commit (hatta ayrı bir PR) olsun. Her adımın sonunda **"Bitti sayılır"** maddelerini kontrol et.
-Claude Code'a her adımda şunu söyle: *"PLAN.md'de Adım N'yi yap. Önce planını kısaca anlat, sonra uygula, sonunda build ve test çalıştır."*
+Each step is one commit. Check the **"Done when"** items at the end of every step.
+Prompt for the assistant: *"Do Step N in PLAN.md. Explain your plan briefly first, then implement it, then run build and test."*
 
-### Adım 0: Repo ve iskelet
-- [x] `git init`, `.gitignore` (dotnet), `README.md` taslağı, `PLAN.md` ve `CLAUDE.md` repoya.
-- [x] Solution (`.slnx`) ve tüm projeler, proje referansları katman kurallarına göre:
+### Step 0: Repository and skeleton
+- [x] `git init`, `.gitignore` (dotnet), draft `README.md`, `PLAN.md` and `CLAUDE.md`.
+- [x] Solution (`.slnx`) and all projects, with project references following the layer rules:
   - Domain ← Application ← Infrastructure ← Api / Worker.
-  - Api ve Worker, ServiceDefaults'a referans verir.
-- [x] Aspire AppHost: Postgres (`basisops` veritabanı), FakeSap, Api (sabit port **5081**), Worker. Api ve Worker Postgres'i bekler (`WaitFor`).
+  - Api and Worker reference ServiceDefaults.
+- [x] Aspire AppHost: Postgres (`basisops` database), FakeSap, Api (fixed port **5081**), Worker. Api and Worker wait for Postgres (`WaitFor`).
 - [x] `Directory.Build.props`: `net10.0`, `Nullable enable`, `TreatWarningsAsErrors`, `ImplicitUsings`.
-- [x] `Directory.Packages.props` ile merkezi paket versiyonu.
+- [x] Central package management with `Directory.Packages.props`.
 
-**Bitti sayılır:** `dotnet build` hatasız. `dotnet run --project src/BasisOps.AppHost` dashboard'u açıyor, tüm kaynaklar "Running".
-**Commit:** `chore: solution skeleton with Aspire AppHost`
+**Done when:** `dotnet build` succeeds. `dotnet run --project src/BasisOps.AppHost` opens the dashboard and every resource is "Running".
 
-### Adım 1: FakeSap
-- [x] Sistemler: `PRD` (prod), `QAS`, `DEV`. Her istek `/sap/{sid}/...` ile başlar.
-  - Ek: `GET /sap/systems` (T000 / CCCATEGORY: P/T/C) ve `GET /sap/{sid}/dumps/{dumpId}` (ST22 detay, AI analizi için).
-- [x] Okuma uçları (SAP'deki karşılıkları yorumda yazsın):
+### Step 1: FakeSap
+- [x] Systems: `PRD` (production), `QAS`, `DEV`. Every request starts with `/sap/{sid}/...`.
+  - Extra: `GET /sap/systems` (T000 / CCCATEGORY: P/T/C) and `GET /sap/{sid}/dumps/{dumpId}` (ST22 detail, for the AI analysis).
+- [x] Read endpoints (with the SAP equivalent in a comment):
   - `GET /sap/{sid}/jobs?status=canceled` (SM37): JOBNAME, JOBCOUNT, STATUS, STRTDATE, user.
-  - `GET /sap/{sid}/dumps?since=` (ST22): runtime error tipi (`TIME_OUT`, `DBSQL_DUPLICATE_KEY_ERROR`, `MESSAGE_TYPE_X`…), program, user, kısa metin.
-  - `GET /sap/{sid}/users/locked` (SU01): BNAME, kilit nedeni (yanlış şifre / admin), zaman.
-  - `GET /sap/{sid}/transports/queue` (STMS): TRKORR, sahibi, durum, return code (0/4/8/12).
-  - `GET /sap/{sid}/certificates` (STRUST): PSE adı, bitiş tarihi.
-  - `GET /sap/{sid}/workprocesses` (SM50): tip (DIA/BTC/UPD), toplam/meşgul.
-- [x] Aksiyon uçları (idempotent; BAPIRET2 benzeri cevap):
-  - `POST /sap/{sid}/users/{bname}/unlock` (BAPI_USER_UNLOCK karşılığı).
+  - `GET /sap/{sid}/dumps?since=` (ST22): runtime error (`TIME_OUT`, `DBSQL_DUPLICATE_KEY_ERROR`, `MESSAGE_TYPE_X`…), program, user, short text.
+  - `GET /sap/{sid}/users/locked` (SU01): BNAME, lock reason (wrong password / administrator), time.
+  - `GET /sap/{sid}/transports/queue` (STMS): TRKORR, owner, status, return code (0/4/8/12).
+  - `GET /sap/{sid}/certificates` (STRUST): PSE name, expiry date.
+  - `GET /sap/{sid}/workprocesses` (SM50): type (DIA/BTC/UPD), total / busy.
+- [x] Action endpoints (idempotent, BAPIRET2-like answer):
+  - `POST /sap/{sid}/users/{bname}/unlock` (like BAPI_USER_UNLOCK).
   - `POST /sap/{sid}/jobs/{jobname}/{jobcount}/restart`.
   - `POST /sap/{sid}/transports/{trkorr}/import`.
-- [x] Veri, sabit bir seed ile gerçekçi ve tekrarlanabilir üretilsin. Zaman içinde yeni dump ve kilit olayları eklensin.
-- [x] Chaos ayarı (`appsettings`): `FailurePercent` (503), `RateLimitPercent` (429 + Retry-After), `LatencyMs`.
-- [x] SAP alan adları JSON'da büyük harf kalsın (BNAME, TRKORR). Domain'e sızmaması ACL'in işi.
+- [x] Data is realistic and reproducible from a fixed seed. New dumps and lock events appear over time.
+- [x] Chaos settings (`appsettings`): `FailurePercent` (503), `RateLimitPercent` (429 + Retry-After), `LatencyMs`.
+- [x] SAP field names stay upper case in JSON (BNAME, TRKORR). Keeping them out of the domain is the ACL's job.
 
-**Bitti sayılır:** `FakeSap.http` dosyasındaki isteklerin hepsi cevap veriyor. Chaos %100 yapılınca 503 dönüyor.
-**Commit:** `feat(fakesap): simulate SM37/ST22/SU01/STMS/STRUST/SM50 with chaos settings`
+**Done when:** every request in `FakeSap.http` answers. With chaos at 100% the simulator returns 503.
 
-### Adım 2: Domain + Application
+### Step 2: Domain + Application
 - [x] Domain:
-  - `SapSystem` (Sid, Role: Prod/Quality/Dev).
-  - `HealthScan` (zaman, sistem, süre, durum).
-  - `Finding`: Category (Job, Dump, User, Transport, Certificate, WorkProcess), Severity (Info, Warning, Critical), Key (tekrarı engellemek için örn. `JOB:PRD:Z_BILLING:1234`), FirstSeen, LastSeen, Resolved.
-  - `ActionRequest` durum makinesi: `Requested → Approved → Executing → Succeeded | Failed`, `Requested → Rejected`. Geçersiz geçiş exception fırlatır.
-    - Ek geçiş: `Executing → Approved` (geçici hata, `NextAttemptAt` ile retry). `MaxAttempts` aşılınca `Failed`.
-  - Alanlar: Type, Target, RequestedBy, ApprovedBy, Attempts, LastError, IdempotencyKey.
-  - **Kural:** Prod sistemde talep eden kişi kendi talebini onaylayamaz (four-eyes principle).
-  - `AuditEntry`: kim, ne, ne zaman, önceki → sonraki durum. Her geçiş kendi audit kaydını döndürür.
-  - `FindingReconciler`: yeni tarama sonucunu açık bulgularla birleştirir (aç / güncelle / çözüldü). Çözülen bulgu tekrar görülürse yeni bulgu açılır.
-- [x] Kurallar (`IHealthRule`, her biri ayrı sınıf, test edilebilir):
-  - İptal olan job: kritik job listesi (`Z_BILLING*`, `SAP_COLLECTOR*`) → Critical, diğerleri → Warning. Aynı job'ın sonradan başarılı çalışması varsa bulgu çözülmüş sayılır.
-  - Dump: son 1 saatte aynı tipten ≥ 5 → Warning, ≥ 20 → Critical.
-  - Sertifika: < 30 gün → Warning, < 7 gün → Critical.
+  - `SapSystem` (Sid, Role: Production / Quality / Development).
+  - `HealthScan` (time, system, duration, status).
+  - `Finding`: Category (Job, Dump, User, Transport, Certificate, WorkProcess), Severity (Info, Warning, Critical),
+    Key (prevents duplicates, e.g. `JOB:PRD:Z_BILLING:1234`), FirstSeen, LastSeen, Resolved.
+  - `ActionRequest` state machine: `Requested → Approved → Executing → Succeeded | Failed`, `Requested → Rejected`.
+    An invalid transition throws.
+    - Extra transition: `Executing → Approved` (transient error, retried at `NextAttemptAt`). Beyond `MaxAttempts` → `Failed`.
+  - Fields: Type, Target, RequestedBy, DecidedBy, Attempts, LastError, IdempotencyKey.
+  - **Rule:** on production, the requester cannot approve their own request (four-eyes principle).
+  - `AuditEntry`: who, what, when, previous → next state. Every transition returns its own audit entry.
+  - `FindingReconciler`: merges a new scan with the open findings (open / update / resolve).
+    A resolved finding that shows up again opens a new finding.
+- [x] Rules (`IHealthRule`, one class each, testable):
+  - Canceled job: critical job list (`Z_BILLING*`, `SAP_COLLECTOR*`) → Critical, others → Warning.
+    A later successful run of the same job resolves the finding.
+  - Dumps: ≥ 5 of the same type in the last hour → Warning, ≥ 20 → Critical.
+  - Certificate: < 30 days → Warning, < 7 days → Critical.
   - Transport: RC ≥ 8 → Critical, RC 4 → Info.
-  - Work process: DIA doluluk > %80 → Warning, > %95 → Critical.
-  - Kilitli kullanıcı: Info (tek başına alarm değil, self-servis için listelenir).
+  - Work processes: DIA utilization > 80% → Warning, > 95% → Critical.
+  - Locked user: Info (not an alarm on its own; listed for self-service).
 - [x] Application:
-  - Portlar: `ISapGateway`, `IAiAnalyzer`, `TimeProvider`. Ek: `ISystemRegistry` (sistem + rol; four-eyes için SAP'ye gitmeden), repository'ler ve `IUnitOfWork`.
-  - Komutlar: `RunHealthScan`, `RequestAction`, `ApproveAction`, `RejectAction`.
-  - Sorgular: `GetSystemHealth`, `ListFindings`, `GetAction`, `GetDailyReport`. Ek (Api için): `ListActions`, `GetAuditLog`.
-  - Basit `ICommandHandler<TCommand, TResult>` ve `IQueryHandler<TQuery, TResult>`. Validation handler girişinde yapılır.
-  - Handler'lar `Result<T>` döner (Validation → 400, NotFound → 404, Conflict → 409, Forbidden → 403). Four-eyes ihlali → 403.
+  - Ports: `ISapGateway`, `IAiAnalyzer`, `TimeProvider`. Extra: `ISystemRegistry` (system + role, so four-eyes works without SAP),
+    repositories and `IUnitOfWork`.
+  - Commands: `RunHealthScan`, `RequestAction`, `ApproveAction`, `RejectAction`.
+  - Queries: `GetSystemHealth`, `ListFindings`, `GetAction`, `GetDailyReport`. Extra (for the Api): `ListActions`, `GetAuditLog`.
+  - Simple `ICommandHandler<TCommand, TResult>` and `IQueryHandler<TQuery, TResult>`. Validation happens at the handler entry.
+  - Handlers return `Result<T>` (Validation → 400, NotFound → 404, Conflict → 409, Forbidden → 403). Four-eyes violation → 403.
 
-**Bitti sayılır:** UnitTests projesinde kural ve durum makinesi testleri yeşil (en az 15 test).
-**Commit:** `feat(domain): findings, rules and action approval state machine`
+**Done when:** rule and state machine tests in the unit test project are green (at least 15 tests).
 
-### Adım 3: Infrastructure + Api
-- [x] EF Core + Npgsql: `BasisOpsDbContext`, migration'lar. Aspire ile Postgres bağlantısı (`AddNpgsqlDbContext`).
-- [x] `FakeSapGateway`:
-  - Typed HttpClient, `AddStandardResilienceHandler` (retry + jitter, circuit breaker, timeout).
-  - SAP DTO → domain dönüşümü (ACL) burada yapılır.
-- [x] Api uçları (`/api/v1`):
+### Step 3: Infrastructure + Api
+- [x] EF Core + Npgsql: `BasisOpsDbContext`, migrations. Postgres connection through Aspire (`AddNpgsqlDbContext`).
+- [x] SAP gateway:
+  - Typed HttpClient, `AddStandardResilienceHandler` (retry with jitter, circuit breaker, timeout).
+  - SAP DTO → domain translation (ACL) happens here.
+- [x] Api endpoints (`/api/v1`):
   - `GET /systems`, `GET /systems/{sid}/health`.
-  - `GET /findings?sid=&severity=&open=true` (sayfalı).
-  - `POST /actions` (`Idempotency-Key` başlığı zorunlu; aynı anahtar + farklı içerik → 409) → `202 Accepted` + Location.
-  - `POST /actions/{id}/approve`, `POST /actions/{id}/reject` (gövde: kim, neden).
+  - `GET /findings?sid=&severity=&open=true` (paged).
+  - `POST /actions` (`Idempotency-Key` header required; same key + different content → 409) → `202 Accepted` + Location.
+  - `POST /actions/{id}/approve`, `POST /actions/{id}/reject` (body: who, why).
   - `GET /actions/{id}`, `GET /actions?status=`.
   - `GET /audit?target=`.
-- [x] Hata formatı: ProblemDetails. Doğrulama hatası → 400. Geçersiz durum geçişi → 409.
-- [x] Kimlik: n8n için basit `X-Api-Key` (local). README'de "prod'da Entra ID / OAuth2" notu.
-- [x] OpenAPI + Scalar (ya da Swagger UI) `/scalar`.
+- [x] Error format: ProblemDetails. Validation error → 400. Invalid state transition → 409.
+- [x] Identity: a simple `X-Api-Key` for n8n (local). The README notes "Entra ID / OAuth2 in production".
+- [x] OpenAPI + Scalar at `/scalar`.
 
-- Notlar (uygulama sırasında):
-  - Sistem listesi ve rolleri ayardan gelir (`Landscape:Systems`), SAP'den değil: four-eyes kuralı SAP kapalıyken de çalışır.
-  - Ek uç: `POST /systems/{sid}/scans` (elle tarama; Worker gelene kadar ve n8n "şimdi tara" için).
-  - `ActionRequest` için `xmin` ile optimistic concurrency; açık bulgu için kısmi unique index `(sid, key) WHERE resolved_at IS NULL`. Çakışma ve unique ihlali → 409.
-  - Aynı Idempotency-Key + aynı içerik → aynı aksiyon, `202` + `Idempotent-Replayed: true`.
-  - ServiceDefaults'un varsayılan resilience handler'ı SAP client'ında kaldırılıp tek, ayarlı pipeline eklendi (test: chaos %100'de 1 + N retry isteği).
-  - BAPI `TYPE = W` başarı sayılır (idempotent tekrar). 404/409 → `Rejected`.
-  - Migration'lar Development'ta Api açılışında uygulanır (`Database:MigrateOnStartup`). Adım 4'te Worker `WaitFor(api)`.
-  - AI Adım 5'e kadar `DisabledAiAnalyzer` (rapor AI'sız döner).
-  - Testcontainers integration testleri Adım 7'den öne alındı (aksiyon akışı, idempotency, four-eyes, xmin, kısmi index, api key).
+> **Implementation notes:**
+> - Systems and their roles come from configuration (`Landscape:Systems`), not from SAP: the four-eyes rule works while SAP is down.
+> - Extra endpoint: `POST /systems/{sid}/scans` (scan now, for manual use and n8n).
+> - `ActionRequest` uses `xmin` for optimistic concurrency; open findings have a partial unique index `(sid, key) WHERE resolved_at IS NULL`.
+>   A concurrency conflict or unique violation → 409.
+> - Same Idempotency-Key + same content → same action, `202` + `Idempotent-Replayed: true`.
+> - The default resilience handler from ServiceDefaults is removed for the SAP client and replaced by one tuned pipeline
+>   (tested: with chaos at 100%, 1 + N retry requests).
+> - BAPI `TYPE = W` counts as success (idempotent repeat). 404/409 from SAP → `Rejected`.
+> - In Development, migrations run when the Api starts (`Database:MigrateOnStartup`). The Worker waits for the Api.
+> - Testcontainers integration tests were brought forward from Step 7 (action flow, idempotency, four-eyes, xmin, partial index, api key).
 
-**Bitti sayılır:** `BasisOps.Api.http` ile talep oluştur → onayla → durumu sorgula zinciri çalışıyor. Aynı Idempotency-Key ikinci kez gönderilince aynı aksiyon dönüyor.
-**Commit:** `feat(api): findings and approval-based actions with idempotency`
+**Done when:** in `BasisOps.Api.http`, request → approve → get status works. Sending the same Idempotency-Key again returns the same action.
 
-### Adım 4: Worker
-- [x] `HealthScanWorker`: `PeriodicTimer` ile her sistem için tarama (ayar: `ScanIntervalSeconds`, varsayılan 60).
-  - Bulgu varsa `LastSeen` güncellenir, yoksa yenisi açılır, kaybolan bulgu `Resolved` olur.
+### Step 4: Worker
+- [x] `HealthScanWorker`: scans every system with a `PeriodicTimer` (setting `ScanIntervalSeconds`, default 60).
+  - Existing findings get a new `LastSeen`, new ones are opened, vanished ones are `Resolved`.
 - [x] `ActionExecutorWorker`:
-  - `Approved` aksiyonları `FOR UPDATE SKIP LOCKED` ile alır, FakeSap'e uygular.
-  - Geçici hatada `Attempts++` ve backoff ile tekrar dener. `MaxAttempts` (5) aşılırsa `Failed` olur ve audit + log'a "alarm" yazar.
-  - Circuit breaker açıkken denemeyi sayma, bekle.
-- [x] Her worker DbContext'i scope içinde kullanır (captive dependency yok, `IServiceScopeFactory`).
-- [x] Log'larda correlation: aksiyon id'si ve sid structured log alanı olarak geçer.
+  - Picks `Approved` actions with `FOR UPDATE SKIP LOCKED` and applies them to SAP.
+  - On transient errors: `Attempts++` and retry with backoff. Beyond `MaxAttempts` (5) the action is `Failed`, with an alarm in audit and log.
+  - While the circuit breaker is open, wait without counting an attempt.
+- [x] Each worker uses its DbContext inside a scope (no captive dependency, `IServiceScopeFactory`).
+- [x] Log correlation: action id and SID are structured log fields.
 
-- Notlar (uygulama sırasında):
-  - Yürütme mantığı Application'da (`ActionExecutor`); Worker sadece döngü. Aksiyon kısa bir transaction içinde `FOR UPDATE SKIP LOCKED` ile alınıp `Executing` yapılır, SAP çağrısı kilit dışında yapılır.
-  - Lease: `Executing`'de `ExecutionLease`'ten (2 dk) uzun kalan aksiyon (executor çöktü) kesintiye uğramış deneme sayılıp tekrar denenir. SAP aksiyonları idempotent olduğu için güvenli.
-  - Devre açıkken `ActionRequest.Defer` (deneme sayılmaz). Gateway, çağrı sırasında SAP'ye gerçekten istek gittiyse "devre açık" demez: aksi halde kalıcı kesintide aksiyon hiç `Failed` olmuyordu (canlı chaos %100 testinde bulundu).
-  - Backoff: 5 sn × 2^(deneme−1), en fazla 2 dk, ±%20 jitter. `MaxAttempts` aşılınca `Failed` + `LogCritical` "ALARM".
-  - Domain düzeltmesi: `RecordFailure`/`Defer` sadece `Executing`'den çağrılabilir (yoksa `Requested → Approved` onaysız geçiş olabiliyordu).
-  - Trace: `BasisOps.Application` kaynağı (`health-scan`, `execute-action` span'leri). Worker, migration için `WaitFor(api)`.
-  - Canlı doğrulama: chaos %50 → aksiyonlar `Succeeded` (HTTP retry'ları absorbe etti); %100 → 5 denemede `Failed` + ALARM.
-  - Adım 7'den öne alınan testler: talep → onay → yürütme → Succeeded, 4 paralel executor'da her aksiyon tek kez (SKIP LOCKED), lease kurtarma.
+> **Implementation notes:**
+> - The execution logic lives in the Application layer (`ActionExecutor`); the Worker is only the loop. The action is claimed in a short
+>   transaction with `FOR UPDATE SKIP LOCKED` and set to `Executing`; the SAP call happens outside the lock.
+> - Lease: an action that stays in `Executing` longer than `ExecutionLease` (2 min, executor crashed) counts as an interrupted attempt
+>   and is retried. Safe because the SAP actions are idempotent.
+> - While the circuit is open: `ActionRequest.Defer` (no attempt counted). The gateway only reports "circuit open" if no request
+>   actually reached SAP; otherwise an action never became `Failed` during a long outage (found in a live chaos 100% test).
+> - Backoff: 5 s × 2^(attempt−1), at most 2 min, ±20% jitter. Beyond `MaxAttempts`: `Failed` + `LogCritical` "ALARM".
+> - Domain fix: `RecordFailure` / `Defer` are only allowed from `Executing` (otherwise `Requested → Approved` without approval was possible).
+> - Tracing: source `BasisOps.Application` (`health-scan`, `execute-action` spans).
+> - Live check: chaos 50% → actions end `Succeeded` (HTTP retries absorbed the errors); 100% → `Failed` after 5 attempts + ALARM.
+> - Brought forward from Step 7: request → approve → execute → Succeeded, 4 parallel executors apply each action once (SKIP LOCKED), lease recovery.
 
-**Bitti sayılır:** Aspire dashboard'da tarama trace'leri görünüyor. FakeSap chaos %50 iken onaylı aksiyonlar retry ile sonunda `Succeeded` oluyor. %100 iken `Failed` oluyor.
-**Commit:** `feat(worker): periodic health scan and approved action executor`
+**Done when:** scan traces show up in the Aspire dashboard. With FakeSap chaos at 50%, approved actions end `Succeeded` after retries; at 100% they end `Failed`.
 
-### Adım 5: AI (Ollama + Microsoft.Extensions.AI)
-- [x] `IChatClient` kaydı: `OllamaSharp` paketi, model ve adres ayardan (`Ai:Endpoint=http://localhost:11434`, `Ai:Model=qwen3:8b`).
+### Step 5: AI (Ollama + Microsoft.Extensions.AI)
+- [x] `IChatClient` registration: `OllamaSharp`, model and address from configuration (`Ai:Endpoint=http://localhost:11434`, `Ai:Model=qwen3:8b`).
 - [x] `OllamaAiAnalyzer : IAiAnalyzer`:
-  - `AnalyzeDump(dump)`: olası neden, etki, Basis tarafında ilk adımlar, ilgili SAP işlem kodu. **JSON şemalı çıktı** (record'a parse edilir).
-  - `SummarizeDaily(findings)`: 5–8 satır Türkçe yönetici özeti + öncelik sırası.
-- [x] Modele gitmeden önce **maskeleme**: kullanıcı adları, host ve IP'ler → `USER_1`, `HOST_1`. Cevapta geri çevrilmez.
-- [x] Prompt injection: dump metni "veri" olarak işaretlenir, talimat olarak görülmez (system prompt'ta açıkça yazılır).
-- [x] **Fallback:** Ollama kapalıysa ya da timeout olursa rapor AI'sız (kural tabanlı liste) döner, hata fırlatmaz.
-- [x] Api: `POST /dumps/{id}/analyze`, `GET /reports/daily?sid=PRD`.
+  - `AnalyzeDump(dump)`: probable cause, impact, first steps for the Basis team, related transaction codes. **JSON schema output** parsed into a record.
+  - `SummarizeDaily(findings)`: 5–8 line management summary in priority order, in the configured language.
+- [x] **Masking** before the model: user names, hosts and IPs → `USER_1`, `HOST_1`. Not translated back in the answer.
+- [x] Prompt injection: dump text is marked as data, never as instructions (stated in the system prompt).
+- [x] **Fallback:** if Ollama is down or times out, the report is returned without AI (rule-based list), no exception.
+- [x] Api: `POST /systems/{sid}/dumps/{dumpId}/analyze`, `GET /reports/daily?sid=PRD`.
 
-- Notlar (uygulama sırasında):
-  - Paketler: `OllamaSharp` 5.5.2 + `Microsoft.Extensions.AI` 10.11.0 (11.0, runtime paketlerini 11'e çektiği için 10.x'te kalındı).
-  - Ollama HttpClient'ında ServiceDefaults'un resilience handler'ı kaldırıldı (10 sn deneme süresi her üretimi keserdi). Tek deneme, `Ai:Timeout` 2 dk (modelin soğuk yüklenmesi için).
-  - `think: false` (qwen3) ve JSON şemalı `format`, Ollama'ya giden istek gövdesi üzerinden testle doğrulandı.
-  - Maskeleme: bilinen değerler büyük/küçük harf duyarlı ve tam kelime (kullanıcı `CAN`, "canceled"i bozmaz); "user/owner X", "server X" kalıpları; IP, FQDN, e-posta. Bulgu `Key`'i (içinde kullanıcı adı var) modele gönderilmez. Tüm kuralların ürettiği bulgularla "sızıntı yok" testi var.
-  - Özet prompt'una kural tabanlı genel durum eklendi: model kritik bulgu varken "sistem sağlıklı" diyordu (canlı denemede görüldü).
-  - Uç değişikliği: dump id'si ST22'de sadece sistem içinde tekil, bu yüzden `POST /systems/{sid}/dumps/{dumpId}/analyze`; ek olarak `GET /systems/{sid}/dumps?hours=24`. Ollama yoksa dump analizi de `aiAvailable: false` ile döner.
-  - `Ai:Enabled` false ise (Worker, testler) `DisabledAiAnalyzer`. Integration testler Ollama'ya gitmez; fallback testi kapalı porta yönlenir.
-  - Canlı: PRD özeti ~13 sn, dump analizi ~7 sn (qwen3:8b, M serisi Mac).
+> **Implementation notes:**
+> - Packages: `OllamaSharp` 5.5.2 + `Microsoft.Extensions.AI` 10.11.0 (11.0 pulls the runtime packages to 11, so we stay on 10.x).
+> - The ServiceDefaults resilience handler is removed from the Ollama HttpClient (its 10 s attempt timeout would cut every generation).
+>   One attempt, `Ai:Timeout` 2 min (the first call loads the model).
+> - `think: false` (qwen3) and the JSON schema `format` are verified by a test on the request body sent to Ollama.
+> - Masking: known values are case-sensitive and whole-word (user `CAN` does not break "canceled"); "user/owner X" and "server X"
+>   patterns; IP, FQDN, e-mail. The finding `Key` (contains user names) is not sent to the model. A test feeds the output of every rule
+>   through the prompt and asserts that nothing leaks.
+> - The summary prompt includes the rule-based overall status: in a live run the model called a system with critical findings "healthy".
+> - Endpoint change: dump ids are unique only within one system (ST22), hence `POST /systems/{sid}/dumps/{dumpId}/analyze`;
+>   plus `GET /systems/{sid}/dumps?hours=24`. Without Ollama the dump analysis returns `aiAvailable: false` too.
+> - `Ai:Enabled` false (Worker, tests) → `DisabledAiAnalyzer`. Integration tests never call Ollama; the fallback test points to a closed port.
+> - Live: PRD summary ~13 s, dump analysis ~7 s (qwen3:8b on an Apple Silicon Mac).
 
-**Bitti sayılır:** Ollama açıkken günlük rapor özetli geliyor. Ollama kapatılınca (`ollama stop` / uygulamayı kapat) rapor yine geliyor, `aiAvailable: false` alanıyla.
-**Commit:** `feat(ai): dump analysis and daily summary with local LLM, masking and fallback`
+**Done when:** with Ollama running, the daily report includes a summary. With Ollama stopped, the report still arrives with `aiAvailable: false`.
 
-### Adım 6: n8n workflow'ları (mevcut n8n'de)
+### Step 6: n8n workflows (in the existing n8n)
 - [x] Credential: Header Auth (`X-Api-Key`), base URL `http://host.docker.internal:5081`.
-- [x] **Basis Sabah Raporu:** Schedule (hafta içi 08:00) → `GET /reports/daily?sid=PRD` → Telegram (HTML). Hata durumunda "Rapor alınamadı" mesajı.
-- [x] **Self-servis Asistan:** Chat Trigger → AI Agent (Ollama `qwen3`) + araçlar:
-  - `kilitli_kullanicilar` → `GET /systems/{sid}/health` (ya da ayrı uç).
-  - `kilit_acma_talebi` → `POST /actions` (Idempotency-Key = sohbet id + kullanıcı).
-  - `talep_durumu` → `GET /actions/{id}`.
-  - System prompt: **ajan asla onay vermez**, sadece talep açar ve durumu söyler.
-- [x] **Onay akışı:** yeni talep → Telegram "Send and Wait for Response" (Onayla / Reddet) → `POST /actions/{id}/approve|reject`.
-- [ ] (Opsiyonel) Runbook RAG: `docs/runbooks/*.md` → pgvector → ajan "bu dump için ne yapmalıyım" sorusunda runbook'a bakar. *(Ertelendi.)*
-- [x] Workflow'ları export et → `n8n/workflows/*.json` (credential içermez).
+- [x] **Daily report:** Schedule (weekdays 08:00) → `GET /reports/daily?sid=PRD` → Telegram (HTML). On error a "report could not be created" message.
+- [x] **Self-service assistant:** Chat Trigger → AI Agent (Ollama `qwen3`) with tools:
+  - `list_locked_users` → `GET /systems/{sid}/locked-users`.
+  - `request_user_unlock` → `POST /actions` (Idempotency-Key = chat session + system + user).
+  - `get_request_status` → `GET /actions/{id}`.
+  - System prompt: **the agent never approves**, it only opens requests and reports their status.
+- [x] **Approval flow:** new request → Telegram "Send and Wait for Response" (Approve / Reject) → `POST /actions/{id}/approve|reject`.
+- [ ] (Optional) Runbook RAG: `docs/runbooks/*.md` → pgvector → the agent consults runbooks for "what should I do about this dump". *(Postponed.)*
+- [x] Export the workflows → `n8n/workflows/*.json` (no credentials).
 
-> **Uygulama notları:**
-> - Araç adları ve Telegram'daki sabit metinler CLAUDE.md gereği İngilizce: `list_locked_users`, `request_user_unlock`, `get_request_status`; hata mesajı "morning report could not be created". AI özeti Türkçe kalır.
-> - Kilitli kullanıcılar için ayrı uç eklendi: `GET /systems/{sid}/locked-users` (yalnız ad, neden, zaman). Ajan `/health`'in host/sertifika detaylarını görmez.
-> - Kurallar prompt'ta değil akışta: ajanda onay aracı yok; tip (`UnlockUser`), `requestedBy` (`self-service:<session>`) ve `Idempotency-Key` alt workflow'da üretilir. Onay yalnızca yeni talepte (replay değilse) tetiklenir ve sohbet onayı beklemez. Araç önce kullanıcının gerçekten kilitli olduğunu `locked-users` ile kontrol eder.
-> - Ajan kullanıcı adlarını açık görür (işi bu); model local, veri makineden çıkmaz. Maskeleme API'nin LLM'e gönderdiği analiz metinleri için geçerli.
-> - Telegram onay butonları `http://localhost:5678` imzalı linkini açar: yerelde yalnızca n8n'in çalıştığı Mac'ten onaylanabilir. Telefon için public HTTPS gerekir. Onaylayan adı Settings'teki `approverName` (link tıklaması kimlik taşımaz).
-> - n8n 2.x: bir workflow, çağırdığı alt workflow'lar yayınlanmadan yayınlanamıyor. Sıra: Approval → Unlock → Agent → Report. Import CLI ile (`n8n/import-workflows.sh`) id'leri korur.
-> - Doğrulama, geçici bir n8n 2.47.5 container'ında yapıldı: rapor (AI özetli ve hata yolu), kilit açma (yeni / replay / geçersiz / 404), onay ve red, gerçek qwen3 ile ajan (talep, durum, "onayla" baskısı, listeleme), zaman aşımı dalı, kilitli olmayan kullanıcı ve audit kaydı. Gerçek Telegram gönderimi kullanıcı tarafında denenecek.
+> **Implementation notes:**
+> - Dedicated endpoint for locked users: `GET /systems/{sid}/locked-users` (name, reason, time only). The agent never sees the host
+>   and certificate details of `/health`.
+> - The rules live in the workflow, not only in the prompt: the agent has no approval tool; type (`UnlockUser`), `requestedBy`
+>   (`self-service:<session>`) and `Idempotency-Key` are built in the sub-workflow. The tool first checks with `locked-users` that the user
+>   is really locked. Only new requests (not replays) start an approval, and the chat does not wait for it.
+> - The agent sees user names in clear text (that is its job); the model is local and the data does not leave the machine.
+>   Masking applies to the analysis texts the Api sends to the LLM.
+> - The Telegram approval buttons open a signed `http://localhost:5678` link: locally, approval only works from the machine running n8n.
+>   A phone needs public HTTPS. The approver name is `approverName` from the Settings node (a link click carries no identity).
+> - n8n 2.x only publishes a workflow after the sub-workflows it calls are published. Order: Approval → Unlock → Agent → Report.
+>   The CLI import (`n8n/import-workflows.sh`) keeps the workflow ids.
+> - Verified in a throwaway n8n 2.47.5 container: report (with AI summary and the failure path), unlock (new / replay / invalid / 404),
+>   approve and reject, agent with the real qwen3 (request, status, "approve it now" pressure, listing), the timeout branch,
+>   a user who is not locked, and the audit trail. A real Telegram send is left to the user.
 
-**Bitti sayılır:** Sohbette "PRD'de MEHMET kullanıcısı kilitlendi" yazınca talep açılıyor, Telegram'a onay düşüyor, onaylayınca birkaç saniye içinde kilit açılıyor ve audit'te görünüyor.
-**Commit:** `Add n8n workflows for daily report, self-service agent and Telegram approval`
+**Done when:** writing "User MEHMET is locked on PRD" in the chat opens a request, an approval arrives in Telegram,
+after approval the user is unlocked within seconds and the audit log shows it.
 
-### Adım 7: Testler ve CI
-- [ ] Unit: kurallar, durum makinesi, maskeleme, idempotency hash karşılaştırması.
-- [ ] Integration (Testcontainers PostgreSQL + `WebApplicationFactory`, FakeSap yerine `ISapGateway` test double'ı):
-  - Talep → onay → yürütme → Succeeded.
-  - Aynı Idempotency-Key → tek kayıt. Farklı içerik → 409.
-  - Prod'da kendi talebini onaylama → 409 / 403.
-  - İki executor aynı anda çalışınca aynı aksiyon iki kez uygulanmıyor (`SKIP LOCKED`).
-  - Ollama yokken rapor fallback ile dönüyor.
-- [ ] `.github/workflows/ci.yml`: push / PR → restore, build, test (ubuntu-latest, .NET 10). Test sonuç özeti.
-- [ ] README'ye CI rozeti.
+### Step 7: Tests and CI
+- [x] Unit: rules, state machine, masking, idempotency content comparison.
+- [x] Integration (Testcontainers PostgreSQL + `WebApplicationFactory`, an `ISapGateway` test double instead of FakeSap):
+  - Request → approve → execute → Succeeded.
+  - Same Idempotency-Key → one record. Different content → 409.
+  - Approving your own request on production → 403.
+  - Two executors at the same time never apply the same action twice (`SKIP LOCKED`).
+  - Without Ollama the report falls back.
+- [x] `.github/workflows/ci.yml`: push / PR → restore, build, test (ubuntu-latest, .NET 10). Test summary.
+- [x] CI badge in the README.
 
-**Bitti sayılır:** `dotnet test` local'de ve GitHub Actions'ta yeşil.
-**Commit:** `test: integration tests with Testcontainers and CI pipeline`
+> **Implementation notes:**
+> - All test scenarios were written in earlier steps (195 tests: unit, integration, FakeSap contract tests). Approving your own request
+>   on production returns 403; of two approvers racing, one gets 409; four parallel executors apply each action once.
+> - CI: `ubuntu-latest`, .NET version from `global.json`. Release build (warnings are errors), tests, xUnit markdown report → job summary,
+>   TRX + markdown → artifact.
+> - Actions are pinned to commit SHAs (release in a comment), `permissions: contents: read`, older runs on the same branch are canceled.
+> - Also run locally with `TZ=UTC` and invariant culture (close to the CI environment).
+> - The badge is only visible to others once the repository is public.
 
-### Adım 8: Vitrin (portfolyo için en önemli kısım)
-- [ ] README:
-  - Tek cümlelik amaç, sorun → çözüm tablosu, mimari diyagram (Mermaid).
-  - "5 dakikada çalıştır" bölümü, ekran görüntüleri (Aspire dashboard, Telegram raporu, onay mesajı, n8n akışları).
-  - "Neden bu kararlar", "Gerçek SAP'ye nasıl bağlanır", "Prod'da neler değişir" bölümleri.
-- [ ] `docs/architecture.md`: akış diyagramları (tarama, aksiyon onayı, AI).
-- [ ] `docs/interview-notes.md`: aşağıdaki mülakat cümleleri.
-- [ ] Kısa demo GIF'i (sohbet → onay → kilit açıldı).
-- [ ] GitHub repo açıklaması + topic'ler: `dotnet`, `aspire`, `sap-basis`, `n8n`, `ollama`, `clean-architecture`.
+**Done when:** `dotnet test` is green locally and in GitHub Actions.
 
-## 5. "Prod'da neler değişir" (README ve mülakat için)
+### Step 8: Showcase (the most important part for the portfolio)
+- [x] README:
+  - One-sentence purpose, problem → solution table, architecture diagram (Mermaid).
+  - "Run it in 5 minutes", screenshots (Aspire dashboard, Telegram report, approval message, n8n flows).
+  - "Why these decisions", "Connecting to a real SAP system", "What changes in production".
+- [x] `docs/architecture.md`: flow diagrams (scan, action approval, AI).
+- [x] `docs/interview-notes.md`: talking points (section 6 below).
+- [ ] Screenshots in `docs/images/` and a short demo GIF (chat → approval → user unlocked). *(User: needs the real Telegram setup.)*
+- [ ] GitHub repository description + topics: `dotnet`, `aspire`, `sap-basis`, `n8n`, `ollama`, `clean-architecture`. *(User.)*
 
-| Burada | Gerçekte |
+> **Implementation notes:**
+> - The whole repository is English, including `PLAN.md` and `CLAUDE.md`. The default LLM summary language is English
+>   (`Ai:SummaryLanguage`); another language is a local setting.
+
+## 5. What changes in production
+
+| Here | In a real landscape |
 |---|---|
-| FakeSap | SAP NCo (RFC/BAPI) ya da SAP OData; teknik kullanıcı, en az yetki (S_RFC, S_USER_GRP) |
-| X-Api-Key | Entra ID / OAuth2, rol bazlı onay yetkisi |
-| Aksiyon tablosu kuyruk | Yük artarsa RabbitMQ / Service Bus + outbox |
-| Telegram | Teams / ServiceNow / Jira entegrasyonu, ticket açma |
-| Tek Ollama | Kurum içi LLM (LLMaaS) ya da Azure OpenAI, model değerlendirme seti |
-| Aspire local | Aspire'ın ürettiği compose / Kubernetes manifest'leri, Key Vault, pipeline |
+| FakeSap | SAP NCo (RFC/BAPI) or SAP OData; technical user with least privilege (S_RFC, S_USER_GRP) |
+| X-Api-Key | Entra ID / OAuth2, role-based approval rights |
+| Action table as queue | RabbitMQ / Service Bus + outbox if the load grows |
+| Telegram | Teams / ServiceNow / Jira integration, tickets |
+| One local Ollama | Company-hosted LLM or Azure OpenAI, with an evaluation set |
+| Aspire locally | Compose / Kubernetes manifests generated by Aspire, Key Vault, deployment pipeline |
 
-## 6. Mülakatta anlatılacak cümleler
+## 6. Talking points
 
-- **Tek cümle:** "Basis ekibinin sabah kontrollerini ve tekrar eden kullanıcı taleplerini otomatikleştiren, onaylı ve audit'li bir sistem kurdum. Yerel LLM dump'ları ve günlük durumu özetliyor."
-- **Neden onay akışı:** "Prod SAP'de otomasyon da AI da tek başına değişiklik yapmamalı. Four-eyes prensibi ve audit log, denetimde sorulan ilk şeyler."
-- **Neden yerel LLM:** "Müşteri sistem verisi dışarı çıkmıyor, maliyet yok. Yine de modele gitmeden kullanıcı adlarını maskeliyorum."
-- **Dayanıklılık:** "SAP bakımda ya da yavaşsa retry + jitter, devre kesici ve deneme sınırı var. Sınır aşılırsa aksiyon Failed olur ve alarm düşer, sonsuz döngü yok."
-- **Gerçek SAP:** "Gateway arayüzü sayesinde FakeSap yerine SAP .NET Connector ile BAPI çağrısı takılıyor. Domain bundan etkilenmiyor."
-- **Ölçüm:** "Sabah kontrolü elle ~30–45 dk sürüyorsa bu sistemle rapor 08:00'de hazır. Kilit açma talebi dakikalardan saniyelere iniyor." (Rakamları senaryo olarak söyle, ölçülmüş gibi sunma.)
+- **One sentence:** "I built an approval-based, audited system that automates the Basis team's morning checks and recurring user requests.
+  A local LLM summarizes the dumps and the daily status."
+- **Why an approval flow:** "On a production SAP system, neither automation nor AI should change anything on its own.
+  The four-eyes principle and the audit log are the first things an auditor asks for."
+- **Why a local LLM:** "Customer system data never leaves the machine and there is no cost. User names are still masked before the model sees them."
+- **Resilience:** "If SAP is in maintenance or slow: retry with jitter, a circuit breaker and an attempt limit. Beyond the limit the action
+  becomes Failed and raises an alarm; no endless loop."
+- **Real SAP:** "Thanks to the gateway interface, the SAP .NET Connector with BAPI calls replaces FakeSap. The domain does not change."
+- **Impact:** "If the morning check takes 30–45 minutes by hand, the report is ready at 08:00. An unlock request goes from minutes to seconds."
+  (Present these numbers as a scenario, not as a measurement.)
 
-## 7. Sonraki faz (opsiyonel): İK otomasyonu
+## 7. Next phase (optional): HR automation
 
-Aynı altyapı (onaylı aksiyon, audit, n8n, yerel LLM) ile işe giriş / çıkış süreci:
-yeni çalışan → hesap açma, ekipman, eğitim listesi, ilk gün e-postası; çıkışta tüm erişimlerin kapatılması ve kontrol listesi.
+The same building blocks (approved actions, audit, n8n, local LLM) for onboarding and offboarding:
+new employee → accounts, equipment, training list, first-day e-mail; on exit, all access is closed with a checklist.

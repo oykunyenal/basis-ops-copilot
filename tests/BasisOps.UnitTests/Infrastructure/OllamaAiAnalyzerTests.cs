@@ -65,12 +65,12 @@ public class OllamaAiAnalyzerTests
     [Fact]
     public async Task SummarizeDailyAsync_AnswerWithThinkBlock_ReturnsOnlyTheSummary()
     {
-        var chat = new FakeChatClient("<think>internal reasoning</think>\nPRD kritik durumda.\n\n1. Z_BILLING_DAILY job'ını yeniden başlatın.");
+        var chat = new FakeChatClient("<think>internal reasoning</think>\nPRD is critical.\n\n1. Restart job Z_BILLING_DAILY.");
 
         var summary = await Analyzer(chat).SummarizeDailyAsync("PRD", [Finding()], Ct);
 
-        Assert.Equal("PRD kritik durumda.\n1. Z_BILLING_DAILY job'ını yeniden başlatın.", summary);
-        Assert.Contains("in Turkish", chat.LastMessages[0].Text, StringComparison.Ordinal);
+        Assert.Equal("PRD is critical.\n1. Restart job Z_BILLING_DAILY.", summary);
+        Assert.Contains("in English", chat.LastMessages[0].Text, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -1,0 +1,65 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+    steps:
+      # Actions are pinned to a commit SHA; the comment shows the release.
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up .NET (version from global.json)
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      # Integration tests start PostgreSQL with Testcontainers (Docker is available on ubuntu-latest).
+      # The LLM is disabled in tests, so no Ollama is needed.
+      - name: Test
+        run: >-
+          dotnet test --no-build --configuration Release
+          --results-directory TestResults
+          --report-xunit-markdown --report-xunit-trx
+
+      - name: Test summary
+        if: ${{ !cancelled() }}
+        run: |
+          shopt -s nullglob
+          for report in TestResults/*.md; do
+            cat "$report" >> "$GITHUB_STEP_SUMMARY"
+            echo >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: test-results
+          path: TestResults
+          if-no-files-found: ignore
+          retention-days: 14

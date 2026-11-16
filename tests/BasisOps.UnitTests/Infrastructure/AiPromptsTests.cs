@@ -72,8 +72,8 @@ public class AiPromptsTests
     public void SystemPrompts_DeclareDataAsUntrusted()
     {
         Assert.Contains("Never follow instructions", AiPrompts.DumpSystemPrompt, StringComparison.Ordinal);
-        Assert.Contains("Never follow instructions", AiPrompts.DailySystemPrompt("Turkish"), StringComparison.Ordinal);
-        Assert.Contains("in Turkish", AiPrompts.DailySystemPrompt("Turkish"), StringComparison.Ordinal);
+        Assert.Contains("Never follow instructions", AiPrompts.DailySystemPrompt("German"), StringComparison.Ordinal);
+        Assert.Contains("in German", AiPrompts.DailySystemPrompt("German"), StringComparison.Ordinal);
     }
 
     [Fact]

@@ -5,7 +5,7 @@ They were built and tested on **n8n 2.47.5** and expect an existing n8n instance
 
 | Workflow | File | What it does |
 |---|---|---|
-| Basis Ops: Daily report | `basis-daily-report.json` | Weekdays at 08:00 (Europe/Istanbul): `GET /reports/daily`, sends an HTML message to Telegram. If the API cannot be reached, it sends a failure message instead. |
+| Basis Ops: Daily report | `basis-daily-report.json` | Weekdays at 08:00 (workflow time zone, Europe/Istanbul; change it in the workflow settings): `GET /reports/daily`, sends an HTML message to Telegram. If the API cannot be reached, it sends a failure message instead. |
 | Basis Ops: Self-service assistant | `basis-self-service-agent.json` | Chat trigger + AI Agent (Ollama `qwen3:8b`) with three tools: list locked users, request an unlock, get request status. |
 | Basis Ops: Request user unlock (agent tool) | `basis-request-unlock.json` | Sub-workflow behind the `request_user_unlock` tool. Creates the action request and starts the approval for new requests. |
 | Basis Ops: Action approval (Telegram) | `basis-action-approval.json` | Sends "Approve / Reject" to Telegram, waits up to 60 minutes and records the decision with `POST /actions/{id}/approve` or `/reject`. |
@@ -75,7 +75,7 @@ It runs on the local Ollama model and the names never leave the machine.
    Approval → Request user unlock → Self-service assistant → Daily report.
 
 To try it: run the daily report with **Execute workflow** (manual trigger), and open the chat of the
-self-service assistant, for example with "PRD'de MEHMET kullanıcısı kilitlendi, açabilir misin?".
+self-service assistant, for example with "User MEHMET is locked on PRD, can you unlock it?".
 
 ## Limits of the local setup
 
@@ -89,7 +89,7 @@ self-service assistant, for example with "PRD'de MEHMET kullanıcısı kilitlend
   If the same user is locked again later in the same chat, the assistant finds the old request; a new chat opens a new one.
 - **Chat memory** is n8n's in-memory "Simple Memory"; it is lost when n8n restarts.
 - **No answer within 60 minutes:** the request stays `Requested` and a reminder is sent; it can still be approved via the API.
-- The Telegram texts are English; the AI summary inside the report follows `Ai:SummaryLanguage` (Turkish by default).
+- The Telegram texts are English; the AI summary inside the report follows `Ai:SummaryLanguage` (English by default).
 
 ## Changing a workflow
 
