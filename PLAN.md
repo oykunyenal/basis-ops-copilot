@@ -163,20 +163,31 @@ Claude Code'a her adımda şunu söyle: *"PLAN.md'de Adım N'yi yap. Önce plan�
 **Commit:** `feat(domain): findings, rules and action approval state machine`
 
 ### Adım 3: Infrastructure + Api
-- [ ] EF Core + Npgsql: `BasisOpsDbContext`, migration'lar. Aspire ile Postgres bağlantısı (`AddNpgsqlDbContext`).
-- [ ] `FakeSapGateway`:
+- [x] EF Core + Npgsql: `BasisOpsDbContext`, migration'lar. Aspire ile Postgres bağlantısı (`AddNpgsqlDbContext`).
+- [x] `FakeSapGateway`:
   - Typed HttpClient, `AddStandardResilienceHandler` (retry + jitter, circuit breaker, timeout).
   - SAP DTO → domain dönüşümü (ACL) burada yapılır.
-- [ ] Api uçları (`/api/v1`):
+- [x] Api uçları (`/api/v1`):
   - `GET /systems`, `GET /systems/{sid}/health`.
   - `GET /findings?sid=&severity=&open=true` (sayfalı).
   - `POST /actions` (`Idempotency-Key` başlığı zorunlu; aynı anahtar + farklı içerik → 409) → `202 Accepted` + Location.
   - `POST /actions/{id}/approve`, `POST /actions/{id}/reject` (gövde: kim, neden).
   - `GET /actions/{id}`, `GET /actions?status=`.
   - `GET /audit?target=`.
-- [ ] Hata formatı: ProblemDetails. Doğrulama hatası → 400. Geçersiz durum geçişi → 409.
-- [ ] Kimlik: n8n için basit `X-Api-Key` (local). README'de "prod'da Entra ID / OAuth2" notu.
-- [ ] OpenAPI + Scalar (ya da Swagger UI) `/scalar`.
+- [x] Hata formatı: ProblemDetails. Doğrulama hatası → 400. Geçersiz durum geçişi → 409.
+- [x] Kimlik: n8n için basit `X-Api-Key` (local). README'de "prod'da Entra ID / OAuth2" notu.
+- [x] OpenAPI + Scalar (ya da Swagger UI) `/scalar`.
+
+- Notlar (uygulama sırasında):
+  - Sistem listesi ve rolleri ayardan gelir (`Landscape:Systems`), SAP'den değil: four-eyes kuralı SAP kapalıyken de çalışır.
+  - Ek uç: `POST /systems/{sid}/scans` (elle tarama; Worker gelene kadar ve n8n "şimdi tara" için).
+  - `ActionRequest` için `xmin` ile optimistic concurrency; açık bulgu için kısmi unique index `(sid, key) WHERE resolved_at IS NULL`. Çakışma ve unique ihlali → 409.
+  - Aynı Idempotency-Key + aynı içerik → aynı aksiyon, `202` + `Idempotent-Replayed: true`.
+  - ServiceDefaults'un varsayılan resilience handler'ı SAP client'ında kaldırılıp tek, ayarlı pipeline eklendi (test: chaos %100'de 1 + N retry isteği).
+  - BAPI `TYPE = W` başarı sayılır (idempotent tekrar). 404/409 → `Rejected`.
+  - Migration'lar Development'ta Api açılışında uygulanır (`Database:MigrateOnStartup`). Adım 4'te Worker `WaitFor(api)`.
+  - AI Adım 5'e kadar `DisabledAiAnalyzer` (rapor AI'sız döner).
+  - Testcontainers integration testleri Adım 7'den öne alındı (aksiyon akışı, idempotency, four-eyes, xmin, kısmi index, api key).
 
 **Bitti sayılır:** `BasisOps.Api.http` ile talep oluştur → onayla → durumu sorgula zinciri çalışıyor. Aynı Idempotency-Key ikinci kez gönderilince aynı aksiyon dönüyor.
 **Commit:** `feat(api): findings and approval-based actions with idempotency`

@@ -14,5 +14,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\FakeSap\FakeSap.csproj" />
+    <!-- Contract tests: the BasisOps SAP gateway against the simulator. -->
+    <ProjectReference Include="..\..\src\BasisOps.Infrastructure\BasisOps.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

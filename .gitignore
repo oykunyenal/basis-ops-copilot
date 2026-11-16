@@ -19,6 +19,8 @@ artifacts/
 .env
 .env.*
 !.env.example
+# HTTP client private environments (.http files) hold the local API key
+http-client.private.env.json
 appsettings.*.local.json
 *.pfx
 *.pem

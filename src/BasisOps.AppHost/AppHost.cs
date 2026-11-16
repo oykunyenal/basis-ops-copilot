@@ -6,6 +6,10 @@ var postgres = builder.AddPostgres("postgres")
 
 var db = postgres.AddDatabase("basisops");
 
+// Shared key for local callers (n8n, .http files). Set it once in AppHost user-secrets:
+//   dotnet user-secrets set "Parameters:api-key" "<value>" --project src/BasisOps.AppHost
+var apiKey = builder.AddParameter("api-key", secret: true);
+
 // SAP simulator (SM37/ST22/SU01/STMS/STRUST/SM50).
 var fakeSap = builder.AddProject<Projects.FakeSap>("fakesap")
     .WithEndpoint("http", e => e.Port = 5090);
@@ -13,6 +17,7 @@ var fakeSap = builder.AddProject<Projects.FakeSap>("fakesap")
 // The n8n container reaches the Api at http://host.docker.internal:5081, so the port is fixed.
 builder.AddProject<Projects.BasisOps_Api>("api")
     .WithEndpoint("http", e => e.Port = 5081)
+    .WithEnvironment("Auth__ApiKey", apiKey)
     .WithReference(db)
     .WithReference(fakeSap)
     .WaitFor(db);

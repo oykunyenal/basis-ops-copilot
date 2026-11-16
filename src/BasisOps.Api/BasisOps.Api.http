@@ -1,0 +1,95 @@
+# BasisOps API, environment "local".
+# The API key is read from http-client.private.env.json (gitignored), e.g.:
+#   { "local": { "apiKey": "<same value as Parameters:api-key in AppHost user-secrets>" } }
+
+### Systems and their health status
+GET {{baseUrl}}/api/v1/systems
+X-Api-Key: {{apiKey}}
+
+### Run a health scan now
+POST {{baseUrl}}/api/v1/systems/PRD/scans
+X-Api-Key: {{apiKey}}
+
+### Health of PRD
+GET {{baseUrl}}/api/v1/systems/PRD/health
+X-Api-Key: {{apiKey}}
+
+### Open critical findings
+GET {{baseUrl}}/api/v1/findings?severity=Critical&pageSize=20
+X-Api-Key: {{apiKey}}
+
+### Request an unlock (nothing runs before approval)
+# @name requestUnlock
+POST {{baseUrl}}/api/v1/actions
+X-Api-Key: {{apiKey}}
+Idempotency-Key: unlock-prd-mehmet-001
+Content-Type: application/json
+
+{
+  "type": "UnlockUser",
+  "sid": "PRD",
+  "target": "MEHMET",
+  "requestedBy": "alice",
+  "reason": "User called the service desk, identity verified."
+}
+
+### Same key, same content: returns the same action (Idempotent-Replayed: true)
+POST {{baseUrl}}/api/v1/actions
+X-Api-Key: {{apiKey}}
+Idempotency-Key: unlock-prd-mehmet-001
+Content-Type: application/json
+
+{
+  "type": "UnlockUser",
+  "sid": "PRD",
+  "target": "MEHMET",
+  "requestedBy": "alice",
+  "reason": "Retry with a reworded reason."
+}
+
+### Same key, different content: 409
+POST {{baseUrl}}/api/v1/actions
+X-Api-Key: {{apiKey}}
+Idempotency-Key: unlock-prd-mehmet-001
+Content-Type: application/json
+
+{
+  "type": "UnlockUser",
+  "sid": "PRD",
+  "target": "JDOE",
+  "requestedBy": "alice"
+}
+
+### Self-approval on production: 403 (four-eyes)
+POST {{baseUrl}}/api/v1/actions/{{requestUnlock.response.body.$.id}}/approve
+X-Api-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "approvedBy": "alice"
+}
+
+### Approval by a second person
+POST {{baseUrl}}/api/v1/actions/{{requestUnlock.response.body.$.id}}/approve
+X-Api-Key: {{apiKey}}
+Content-Type: application/json
+
+{
+  "approvedBy": "bob",
+  "comment": "Approved."
+}
+
+### Status of the action
+GET {{baseUrl}}/api/v1/actions/{{requestUnlock.response.body.$.id}}
+X-Api-Key: {{apiKey}}
+
+### Approved actions waiting for the executor
+GET {{baseUrl}}/api/v1/actions?status=Approved
+X-Api-Key: {{apiKey}}
+
+### Audit trail of the unlock
+GET {{baseUrl}}/api/v1/audit?target=PRD:MEHMET
+X-Api-Key: {{apiKey}}
+
+### Missing API key: 401
+GET {{baseUrl}}/api/v1/systems

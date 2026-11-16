@@ -14,5 +14,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\BasisOps.Application\BasisOps.Application.csproj" />
+    <ProjectReference Include="..\..\src\BasisOps.Infrastructure\BasisOps.Infrastructure.csproj" />
   </ItemGroup>
 </Project>

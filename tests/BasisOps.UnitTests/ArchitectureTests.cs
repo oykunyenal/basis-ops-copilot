@@ -31,6 +31,20 @@ public class ArchitectureTests
         Assert.Empty(outer);
     }
 
+    [Fact]
+    public void InfrastructureAssembly_ReferencedAssemblies_DoesNotReferenceSimulatorOrHosts()
+    {
+        // The SAP wire format is copied into Infrastructure/Sap; the simulator is only reached over HTTP.
+        var infrastructure = Assembly.Load("BasisOps.Infrastructure");
+
+        var forbidden = infrastructure.GetReferencedAssemblies()
+            .Select(a => a.Name!)
+            .Where(n => n is "FakeSap" or "BasisOps.Api" or "BasisOps.Worker")
+            .ToList();
+
+        Assert.Empty(forbidden);
+    }
+
     private static bool IsFramework(string name) =>
         name is "netstandard" or "mscorlib"
         || name.StartsWith("System", StringComparison.Ordinal)

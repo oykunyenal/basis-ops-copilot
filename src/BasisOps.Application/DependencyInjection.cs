@@ -29,6 +29,7 @@ public static class DependencyInjection
         services.AddScoped<ICommandHandler<ApproveActionCommand, ActionRequestDto>, ApproveActionHandler>();
         services.AddScoped<ICommandHandler<RejectActionCommand, ActionRequestDto>, RejectActionHandler>();
 
+        services.AddScoped<IQueryHandler<ListSystemsQuery, IReadOnlyList<SystemSummaryDto>>, ListSystemsHandler>();
         services.AddScoped<IQueryHandler<GetSystemHealthQuery, SystemHealthDto>, GetSystemHealthHandler>();
         services.AddScoped<IQueryHandler<ListFindingsQuery, PagedResult<FindingDto>>, ListFindingsHandler>();
         services.AddScoped<IQueryHandler<GetActionQuery, ActionRequestDto>, GetActionHandler>();
