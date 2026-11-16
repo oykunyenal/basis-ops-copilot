@@ -1,0 +1,529 @@
+{
+  "id": "BasisOpsUnlock01",
+  "name": "Basis Ops: Request user unlock (agent tool)",
+  "description": "Opens an UnlockUser action request for the self-service agent and starts the Telegram approval for new requests.",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "sid"
+            },
+            {
+              "name": "userName"
+            },
+            {
+              "name": "reason"
+            },
+            {
+              "name": "sessionId"
+            }
+          ]
+        }
+      },
+      "id": "287ff3c5-6d30-5f52-a218-89f0f89f841c",
+      "name": "When called by the agent",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6110403d-a700-51a4-bdff-15a00c49c98e",
+              "name": "apiBaseUrl",
+              "value": "http://host.docker.internal:5081/api/v1",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "967a52fd-6c2c-539e-8111-9fa137b656aa",
+      "name": "Settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// The model only supplies sid, userName and reason. Type, requester and idempotency key are fixed here,\n// so the agent cannot pose as someone else or as an approver.\nconst input = $('When called by the agent').first().json;\nconst sid = String(input.sid ?? '').trim().toUpperCase();\nconst userName = String(input.userName ?? '').trim().toUpperCase();\nconst reason = String(input.reason ?? '').trim().slice(0, 300) || 'Requested in the self-service chat.';\nconst sessionId = String(input.sessionId ?? '').trim();\n\nif (!/^[A-Z][A-Z0-9]{2}$/.test(sid) || !/^[A-Z0-9_.\\-]{1,12}$/.test(userName) || sessionId === '') {\n  return [{ json: { valid: false, message: 'A valid SAP system id (for example PRD) and user name are needed.' } }];\n}\n\nconst requester = `self-service:${sessionId}`.slice(0, 100);\nconst idempotencyKey = `chat:${sessionId}:UnlockUser:${sid}:${userName}`.slice(0, 128);\nreturn [{\n  json: {\n    valid: true,\n    idempotencyKey,\n    body: { type: 'UnlockUser', sid, target: userName, requestedBy: requester, reason },\n  },\n}];\n"
+      },
+      "id": "c862094d-cce9-5bf5-884f-84af35e01874",
+      "name": "Prepare request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "549525c6-56d7-589a-a4bf-fd52d2bd07e5",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f3d515db-aa1f-53df-b056-1a8bc941168b",
+      "name": "Is valid",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Settings').first().json.apiBaseUrl }}/systems/{{ encodeURIComponent($json.body.sid) }}/locked-users",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "9bbf38c1-d7b6-52cc-b088-eefc62ea7f29",
+      "name": "Get locked users",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Only users that are really locked get a request, so a typo (MEHMT) never reaches the approvers.\nconst prepared = $('Prepare request').first().json;\nconst response = $input.first().json;\nif (response.statusCode !== 200) {\n  const body = response.body ?? {};\n  return [{ json: { locked: false, message: `The request was not created: ${body.detail || body.title || 'HTTP ' + response.statusCode}` } }];\n}\n\nconst users = Array.isArray(response.body) ? response.body : [];\nconst locked = users.some((u) => String(u.userName).toUpperCase() === prepared.body.target);\nreturn [{\n  json: locked\n    ? { locked: true }\n    : { locked: false, message: `User ${prepared.body.target} is not locked in ${prepared.body.sid}, so no unlock request was created.` },\n}];\n"
+      },
+      "id": "24524a88-760b-5552-b525-17a6fd52cb3a",
+      "name": "Check user is locked",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "97b55c13-97da-5cf5-97a1-beefdb21c956",
+              "leftValue": "={{ $json.locked }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "830f7d8e-1066-50ba-aac2-98935a3a6160",
+      "name": "Is locked",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1320,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Settings').first().json.apiBaseUrl }}/actions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Idempotency-Key",
+              "value": "={{ $('Prepare request').first().json.idempotencyKey }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($('Prepare request').first().json.body) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "99160e3b-55e8-535f-bd8e-d8d610b75ce8",
+      "name": "Create action request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        -200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nif (response.statusCode === undefined) {\n  // Came from a check that stopped the request (invalid input or user not locked).\n  return [{ json: { ok: false, isNew: false, message: response.message } }];\n}\n\nconst status = response.statusCode;\nconst body = response.body ?? {};\nif (status === 202) {\n  const replayed = String(response.headers?.['idempotent-replayed'] ?? '').toLowerCase() === 'true';\n  return [{\n    json: {\n      ok: true,\n      isNew: !replayed,\n      requestId: body.id,\n      status: body.status,\n      sid: body.sid,\n      userName: body.target,\n      requestedBy: body.requestedBy,\n      reason: body.reason,\n      message: replayed\n        ? `This request already exists (id ${body.id}, status ${body.status}).`\n        : `Unlock request ${body.id} was created. It runs only after the Basis team approves it.`,\n    },\n  }];\n}\n\n// ProblemDetails: title / detail / errors\nconst detail = body.detail || body.title || `The API answered with status ${status}.`;\nconst errors = body.errors ? ' ' + Object.values(body.errors).flat().join(' ') : '';\nreturn [{ json: { ok: false, isNew: false, message: `The request was not created: ${detail}${errors}` } }];\n"
+      },
+      "id": "b3a06a90-c056-5c40-a403-28d229dd6136",
+      "name": "Build result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "bd420555-203b-5389-9d91-e2700e1bbe9e",
+              "leftValue": "={{ $json.isNew }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "40b57ad8-cbaa-5ce1-a1f4-a7af1630e30d",
+      "name": "Is new request",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1980,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "BasisOpsApprove1"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "actionId": "={{ $json.requestId }}",
+            "sid": "={{ $json.sid }}",
+            "target": "={{ $json.userName }}",
+            "requestedBy": "={{ $json.requestedBy }}",
+            "reason": "={{ $json.reason }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "actionId",
+              "displayName": "actionId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "sid",
+              "displayName": "sid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "target",
+              "displayName": "target",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "requestedBy",
+              "displayName": "requestedBy",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "id": "5ff95a0a-438d-5067-bf9e-7fbe523f0fde",
+      "name": "Ask for approval",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        2200,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "ba13f5a6-d404-500a-8b3c-8393e4498842",
+              "name": "result",
+              "value": "={{ $('Build result').first().json.message }}",
+              "type": "string"
+            },
+            {
+              "id": "03b56afa-f694-59d5-863a-31ef6e19f4bf",
+              "name": "requestId",
+              "value": "={{ $('Build result').first().json.requestId ?? '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4b2cdf9f-0dc9-53cf-bc59-190a805b312d",
+      "name": "Tool answer",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2420,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "When called by the agent": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Prepare request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare request": {
+      "main": [
+        [
+          {
+            "node": "Is valid",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is valid": {
+      "main": [
+        [
+          {
+            "node": "Get locked users",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get locked users": {
+      "main": [
+        [
+          {
+            "node": "Check user is locked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check user is locked": {
+      "main": [
+        [
+          {
+            "node": "Is locked",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is locked": {
+      "main": [
+        [
+          {
+            "node": "Create action request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create action request": {
+      "main": [
+        [
+          {
+            "node": "Build result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build result": {
+      "main": [
+        [
+          {
+            "node": "Is new request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is new request": {
+      "main": [
+        [
+          {
+            "node": "Ask for approval",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tool answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask for approval": {
+      "main": [
+        [
+          {
+            "node": "Tool answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Istanbul",
+    "saveManualExecutions": true
+  },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}

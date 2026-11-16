@@ -5,6 +5,7 @@ using BasisOps.Application.Dumps;
 using BasisOps.Application.Findings;
 using BasisOps.Application.Health;
 using BasisOps.Application.Reports;
+using BasisOps.Application.Users;
 using BasisOps.Domain.Rules;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -42,6 +43,7 @@ public static class DependencyInjection
         services.AddScoped<IQueryHandler<GetAuditLogQuery, IReadOnlyList<AuditEntryDto>>, GetAuditLogHandler>();
         services.AddScoped<IQueryHandler<GetDailyReportQuery, DailyReportDto>, GetDailyReportHandler>();
         services.AddScoped<IQueryHandler<ListDumpsQuery, IReadOnlyList<DumpDto>>, ListDumpsHandler>();
+        services.AddScoped<IQueryHandler<ListLockedUsersQuery, IReadOnlyList<LockedUserDto>>, ListLockedUsersHandler>();
 
         return services;
     }

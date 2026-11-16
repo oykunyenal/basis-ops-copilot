@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using BasisOps.Application.Abstractions;
 using BasisOps.Application.Findings;
 using BasisOps.Application.Health;
+using BasisOps.Application.Users;
 using BasisOps.Domain.Findings;
 using BasisOps.Domain.Observations;
 
@@ -46,6 +47,22 @@ public class SystemsApiTests(ApiFactory factory)
         Assert.Contains(health.OpenFindings, f => f.Category == FindingCategory.User);
         Assert.Single(critical!.Items, f => f.Category == FindingCategory.Job);
         Assert.Equal(health.OpenFindings.Count, afterRescan!.OpenFindings.Count);
+    }
+
+    [Fact]
+    public async Task LockedUsers_LockedInSap_ReturnsOnlyNameReasonAndTime()
+    {
+        var name = $"T{Guid.NewGuid():N}"[..12].ToUpperInvariant();
+        factory.Sap.LockedUsers.Add(new LockedUser(name, LockReason.FailedLogons, DateTimeOffset.UtcNow.AddMinutes(-3)));
+        using var client = factory.CreateApiClient();
+
+        using var response = await client.GetAsync("/api/v1/systems/prd/locked-users", Ct);
+        var json = await response.Content.ReadAsStringAsync(Ct);
+        var users = System.Text.Json.JsonSerializer.Deserialize<List<LockedUserDto>>(json, Json.Options);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Contains(users!, u => u.UserName == name && u.Reason == LockReason.FailedLogons);
+        Assert.Contains("\"FailedLogons\"", json, StringComparison.Ordinal);
     }
 
     [Fact]

@@ -239,19 +239,28 @@ Claude Code'a her adımda şunu söyle: *"PLAN.md'de Adım N'yi yap. Önce plan�
 **Commit:** `feat(ai): dump analysis and daily summary with local LLM, masking and fallback`
 
 ### Adım 6: n8n workflow'ları (mevcut n8n'de)
-- [ ] Credential: Header Auth (`X-Api-Key`), base URL `http://host.docker.internal:5081`.
-- [ ] **Basis Sabah Raporu:** Schedule (hafta içi 08:00) → `GET /reports/daily?sid=PRD` → Telegram (HTML). Hata durumunda "Rapor alınamadı" mesajı.
-- [ ] **Self-servis Asistan:** Chat Trigger → AI Agent (Ollama `qwen3`) + araçlar:
+- [x] Credential: Header Auth (`X-Api-Key`), base URL `http://host.docker.internal:5081`.
+- [x] **Basis Sabah Raporu:** Schedule (hafta içi 08:00) → `GET /reports/daily?sid=PRD` → Telegram (HTML). Hata durumunda "Rapor alınamadı" mesajı.
+- [x] **Self-servis Asistan:** Chat Trigger → AI Agent (Ollama `qwen3`) + araçlar:
   - `kilitli_kullanicilar` → `GET /systems/{sid}/health` (ya da ayrı uç).
   - `kilit_acma_talebi` → `POST /actions` (Idempotency-Key = sohbet id + kullanıcı).
   - `talep_durumu` → `GET /actions/{id}`.
   - System prompt: **ajan asla onay vermez**, sadece talep açar ve durumu söyler.
-- [ ] **Onay akışı:** yeni talep → Telegram "Send and Wait for Response" (Onayla / Reddet) → `POST /actions/{id}/approve|reject`.
-- [ ] (Opsiyonel) Runbook RAG: `docs/runbooks/*.md` → pgvector → ajan "bu dump için ne yapmalıyım" sorusunda runbook'a bakar.
-- [ ] Workflow'ları export et → `n8n/workflows/*.json` (credential içermez).
+- [x] **Onay akışı:** yeni talep → Telegram "Send and Wait for Response" (Onayla / Reddet) → `POST /actions/{id}/approve|reject`.
+- [ ] (Opsiyonel) Runbook RAG: `docs/runbooks/*.md` → pgvector → ajan "bu dump için ne yapmalıyım" sorusunda runbook'a bakar. *(Ertelendi.)*
+- [x] Workflow'ları export et → `n8n/workflows/*.json` (credential içermez).
+
+> **Uygulama notları:**
+> - Araç adları ve Telegram'daki sabit metinler CLAUDE.md gereği İngilizce: `list_locked_users`, `request_user_unlock`, `get_request_status`; hata mesajı "morning report could not be created". AI özeti Türkçe kalır.
+> - Kilitli kullanıcılar için ayrı uç eklendi: `GET /systems/{sid}/locked-users` (yalnız ad, neden, zaman). Ajan `/health`'in host/sertifika detaylarını görmez.
+> - Kurallar prompt'ta değil akışta: ajanda onay aracı yok; tip (`UnlockUser`), `requestedBy` (`self-service:<session>`) ve `Idempotency-Key` alt workflow'da üretilir. Onay yalnızca yeni talepte (replay değilse) tetiklenir ve sohbet onayı beklemez. Araç önce kullanıcının gerçekten kilitli olduğunu `locked-users` ile kontrol eder.
+> - Ajan kullanıcı adlarını açık görür (işi bu); model local, veri makineden çıkmaz. Maskeleme API'nin LLM'e gönderdiği analiz metinleri için geçerli.
+> - Telegram onay butonları `http://localhost:5678` imzalı linkini açar: yerelde yalnızca n8n'in çalıştığı Mac'ten onaylanabilir. Telefon için public HTTPS gerekir. Onaylayan adı Settings'teki `approverName` (link tıklaması kimlik taşımaz).
+> - n8n 2.x: bir workflow, çağırdığı alt workflow'lar yayınlanmadan yayınlanamıyor. Sıra: Approval → Unlock → Agent → Report. Import CLI ile (`n8n/import-workflows.sh`) id'leri korur.
+> - Doğrulama, geçici bir n8n 2.47.5 container'ında yapıldı: rapor (AI özetli ve hata yolu), kilit açma (yeni / replay / geçersiz / 404), onay ve red, gerçek qwen3 ile ajan (talep, durum, "onayla" baskısı, listeleme), zaman aşımı dalı, kilitli olmayan kullanıcı ve audit kaydı. Gerçek Telegram gönderimi kullanıcı tarafında denenecek.
 
 **Bitti sayılır:** Sohbette "PRD'de MEHMET kullanıcısı kilitlendi" yazınca talep açılıyor, Telegram'a onay düşüyor, onaylayınca birkaç saniye içinde kilit açılıyor ve audit'te görünüyor.
-**Commit:** `feat(n8n): daily report, self-service agent and Telegram approval workflows`
+**Commit:** `Add n8n workflows for daily report, self-service agent and Telegram approval`
 
 ### Adım 7: Testler ve CI
 - [ ] Unit: kurallar, durum makinesi, maskeleme, idempotency hash karşılaştırması.

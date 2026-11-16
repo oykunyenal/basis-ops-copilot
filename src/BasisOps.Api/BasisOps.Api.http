@@ -91,6 +91,10 @@ X-Api-Key: {{apiKey}}
 GET {{baseUrl}}/api/v1/audit?target=PRD:MEHMET
 X-Api-Key: {{apiKey}}
 
+### Locked users (SU01), used by the n8n self-service agent
+GET {{baseUrl}}/api/v1/systems/PRD/locked-users
+X-Api-Key: {{apiKey}}
+
 ### Short dumps (ST22) of the last 24 hours
 # @name dumps
 GET {{baseUrl}}/api/v1/systems/PRD/dumps?hours=24

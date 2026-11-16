@@ -1,6 +1,7 @@
 using BasisOps.Api.Http;
 using BasisOps.Application.Abstractions;
 using BasisOps.Application.Health;
+using BasisOps.Application.Users;
 
 namespace BasisOps.Api.Endpoints;
 
@@ -26,5 +27,12 @@ internal static class SystemEndpoints
             .WithSummary("Runs a health scan now (the worker also scans periodically).")
             .Produces<HealthScanResult>()
             .ProducesProblem(StatusCodes.Status404NotFound);
+
+        systems.MapGet("/{sid}/locked-users", async (string sid, IQueryHandler<ListLockedUsersQuery, IReadOnlyList<LockedUserDto>> handler, CancellationToken ct) =>
+                (await handler.HandleAsync(new ListLockedUsersQuery(ApiRoutes.NormalizeSid(sid)), ct)).ToHttpResult())
+            .WithSummary("Locked users (SU01), read live from the system, most recently locked first.")
+            .Produces<IReadOnlyList<LockedUserDto>>()
+            .ProducesProblem(StatusCodes.Status404NotFound)
+            .ProducesProblem(StatusCodes.Status503ServiceUnavailable);
     }
 }

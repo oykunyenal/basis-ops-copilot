@@ -67,6 +67,12 @@ The Api talks to Ollama through `Microsoft.Extensions.AI` (`IChatClient`), confi
 - Endpoints: `GET /api/v1/reports/daily?sid=PRD`, `GET /api/v1/systems/{sid}/dumps`,
   `POST /api/v1/systems/{sid}/dumps/{dumpId}/analyze`.
 
+### n8n workflows
+
+[`n8n/`](n8n/README.md) contains four workflows for an existing n8n instance: a weekday morning report to Telegram,
+a self-service chat assistant on the local LLM that opens unlock requests, and a Telegram approval step.
+The assistant has no approve tool; the requester and the idempotency key come from the chat session, not from the model.
+
 ### Security notes
 
 The shared API key is a local-only shortcut for n8n. In production the API would sit behind

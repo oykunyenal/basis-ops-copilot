@@ -1,0 +1,243 @@
+{
+  "id": "BasisOpsReport01",
+  "name": "Basis Ops: Daily report",
+  "description": "Weekday 08:00 SAP health report with the local LLM summary, sent to Telegram.",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "1c4ce8fe-f250-50b9-aa53-0291b0a58558",
+      "name": "Weekdays 08:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "64e7f3dc-f3c8-5fff-ba45-01d6a941bd36",
+      "name": "Run manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6110403d-a700-51a4-bdff-15a00c49c98e",
+              "name": "apiBaseUrl",
+              "value": "http://host.docker.internal:5081/api/v1",
+              "type": "string"
+            },
+            {
+              "id": "89392bfc-801a-5f5c-b0e8-9d8a07807cc3",
+              "name": "sid",
+              "value": "PRD",
+              "type": "string"
+            },
+            {
+              "id": "2aae08e1-41c6-59f2-9707-7d33bdf14560",
+              "name": "telegramChatId",
+              "value": "SET_YOUR_TELEGRAM_CHAT_ID",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "967a52fd-6c2c-539e-8111-9fa137b656aa",
+      "name": "Settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.apiBaseUrl }}/reports/daily?sid={{ encodeURIComponent($json.sid) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 150000
+        }
+      },
+      "id": "e6b7c9ff-f689-5efb-908f-6c2440d28110",
+      "name": "Get daily report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        100
+      ],
+      "onError": "continueErrorOutput",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "jsCode": "const esc = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n// Telegram accepts at most 4096 characters per message.\nconst MAX_LENGTH = 3800;\nconst report = $input.first().json;\nconst counts = report.counts ?? {};\nconst icons = { Healthy: '🟢', Warning: '🟡', Critical: '🔴' };\nconst generated = DateTime.fromISO(report.generatedAt).setZone($now.zone).toFormat('dd.MM.yyyy HH:mm');\n\nconst lines = [\n  `${icons[report.status] ?? '⚪'} <b>SAP ${esc(report.sid)}: morning report</b>`,\n  `Status: <b>${esc(report.status)}</b> (critical ${counts.critical ?? 0}, warning ${counts.warning ?? 0}, info ${counts.info ?? 0})`,\n  `Generated: ${generated}`,\n  '',\n];\n\nif (report.aiAvailable && report.aiSummary) {\n  lines.push('<b>Summary</b>', esc(report.aiSummary), '');\n} else {\n  lines.push('<i>AI summary is not available; the rule-based list is complete.</i>', '');\n}\n\nconst findings = report.findings ?? [];\nif (findings.length === 0) {\n  lines.push('No open findings.');\n} else {\n  lines.push(`<b>Open findings (${findings.length})</b>`);\n  let shown = 0;\n  for (const f of findings) {\n    const line = `• [${esc(f.severity)}] ${esc(f.title)}`;\n    if (lines.join('\\n').length + line.length > MAX_LENGTH) break;\n    lines.push(line);\n    shown++;\n  }\n  if (shown < findings.length) {\n    lines.push(`… and ${findings.length - shown} more (GET /api/v1/findings?sid=${esc(report.sid)}).`);\n  }\n}\n\nreturn [{ json: { text: lines.join('\\n') } }];\n"
+      },
+      "id": "51a5350c-1802-597d-88d0-fb1252282222",
+      "name": "Format report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Settings').first().json.telegramChatId }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "bd509b3f-e7ad-5b16-90de-5a3005145d36",
+      "name": "Send report",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        900,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const esc = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst error = $input.first().json.error ?? {};\nconst detail = error.description || error.message || 'Unknown error';\nconst sid = $('Settings').first().json.sid;\nreturn [{ json: { text: `⚠️ <b>SAP ${esc(sid)}: morning report could not be created.</b>\\n${esc(String(detail).slice(0, 500))}\\nCheck that the Basis Ops API is running.` } }];\n"
+      },
+      "id": "1d269064-9283-5af5-8232-01102a77608e",
+      "name": "Format failure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Settings').first().json.telegramChatId }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "9525b75e-dfc3-5b0b-abc0-a19e41fc35be",
+      "name": "Send failure",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        900,
+        220
+      ]
+    }
+  ],
+  "connections": {
+    "Weekdays 08:00": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run manually": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Get daily report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get daily report": {
+      "main": [
+        [
+          {
+            "node": "Format report",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format report": {
+      "main": [
+        [
+          {
+            "node": "Send report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format failure": {
+      "main": [
+        [
+          {
+            "node": "Send failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Istanbul",
+    "saveManualExecutions": true
+  },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}

@@ -1,0 +1,385 @@
+{
+  "id": "BasisOpsApprove1",
+  "name": "Basis Ops: Action approval (Telegram)",
+  "description": "Asks the Basis team in Telegram to approve or reject a new action request and records the decision in the API.",
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "actionId"
+            },
+            {
+              "name": "sid"
+            },
+            {
+              "name": "target"
+            },
+            {
+              "name": "requestedBy"
+            },
+            {
+              "name": "reason"
+            }
+          ]
+        }
+      },
+      "id": "9fe14d04-3faa-55bc-9817-e90f31fcbebe",
+      "name": "When a request is created",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "6110403d-a700-51a4-bdff-15a00c49c98e",
+              "name": "apiBaseUrl",
+              "value": "http://host.docker.internal:5081/api/v1",
+              "type": "string"
+            },
+            {
+              "id": "2aae08e1-41c6-59f2-9707-7d33bdf14560",
+              "name": "telegramChatId",
+              "value": "SET_YOUR_TELEGRAM_CHAT_ID",
+              "type": "string"
+            },
+            {
+              "id": "c63df465-c13b-57d3-a688-3ec8374e7302",
+              "name": "approverName",
+              "value": "BASIS_ONCALL",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "967a52fd-6c2c-539e-8111-9fa137b656aa",
+      "name": "Settings",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "={{ $json.telegramChatId }}",
+        "message": "=🔐 Approval needed: unlock SAP user\n\nSystem: {{ $('When a request is created').first().json.sid }}\nUser: {{ $('When a request is created').first().json.target }}\nRequested by: {{ $('When a request is created').first().json.requestedBy }}\nReason: {{ $('When a request is created').first().json.reason }}\nRequest id: {{ $('When a request is created').first().json.actionId }}",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double",
+            "approveLabel": "✅ Approve",
+            "disapproveLabel": "❌ Reject"
+          }
+        },
+        "options": {
+          "limitWaitTime": {
+            "values": {
+              "limitType": "afterTimeInterval",
+              "resumeAmount": 60,
+              "resumeUnit": "minutes"
+            }
+          },
+          "appendAttribution": false
+        }
+      },
+      "id": "ac823ebc-b6e5-57f1-bbf4-a24eb551f9e5",
+      "name": "Ask in Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        440,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "b8f7cb8c-e446-5adb-bcdb-3f9ba0e8d8b2",
+                    "leftValue": "={{ $json.data?.approved === true }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Approved"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "5f617de9-0fa9-56a1-8d8e-8e88f73391bc",
+                    "leftValue": "={{ $json.data?.approved === false }}",
+                    "rightValue": "",
+                    "operator": {
+                      "type": "boolean",
+                      "operation": "true",
+                      "singleValue": true
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Rejected"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "No answer"
+        }
+      },
+      "id": "f7654cda-5f93-5a9a-9bd8-bb614d5fc146",
+      "name": "Decision",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        660,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Settings').first().json.apiBaseUrl }}/actions/{{ $('When a request is created').first().json.actionId }}/approve",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ approvedBy: $('Settings').first().json.approverName, comment: 'Approved in Telegram.' }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "612ac1b9-4b9c-5c0e-88c4-4134fb726105",
+      "name": "Approve",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Settings').first().json.apiBaseUrl }}/actions/{{ $('When a request is created').first().json.actionId }}/reject",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ rejectedBy: $('Settings').first().json.approverName, reason: 'Rejected in Telegram.' }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "068ab572-62d7-5f5c-a357-da3d2c0e91de",
+      "name": "Reject",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const esc = (value) => String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst request = $('When a request is created').first().json;\nconst response = $input.first().json;\nconst status = response.statusCode;\nconst body = response.body ?? {};\nconst what = `${esc(request.sid)} / ${esc(request.target)}`;\n\nlet text;\nif (status === 200) {\n  text = body.status === 'Rejected'\n    ? `❌ Rejected: unlock ${what}.`\n    : `✅ Approved: unlock ${what}. The worker runs it within a few seconds.`;\n} else if (status === 403 || status === 409) {\n  // 403: four-eyes rule on production, 409: already decided elsewhere.\n  text = `⚠️ Not applied for ${what}: ${esc(body.detail || body.title)}`;\n} else {\n  text = `⚠️ The decision for ${what} could not be saved (HTTP ${status}). Request id: ${esc(request.actionId)}`;\n}\nreturn [{ json: { text } }];\n"
+      },
+      "id": "269f73ed-b069-5dbc-972e-925e0308b027",
+      "name": "Describe decision",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Settings').first().json.telegramChatId }}",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "890d8f52-64b4-5ae8-8f75-7e6d6d017dcf",
+      "name": "Send decision",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1320,
+        -80
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Settings').first().json.telegramChatId }}",
+        "text": "=⏳ No decision within 60 minutes for unlock {{ $('When a request is created').first().json.sid }} / {{ $('When a request is created').first().json.target }}. The request stays open (id {{ $('When a request is created').first().json.actionId }}).",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "a3f6bd04-a13f-5683-9e92-33f97b4c28a6",
+      "name": "Send no answer",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        180
+      ]
+    }
+  ],
+  "connections": {
+    "When a request is created": {
+      "main": [
+        [
+          {
+            "node": "Settings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Settings": {
+      "main": [
+        [
+          {
+            "node": "Ask in Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask in Telegram": {
+      "main": [
+        [
+          {
+            "node": "Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decision": {
+      "main": [
+        [
+          {
+            "node": "Approve",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reject",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send no answer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approve": {
+      "main": [
+        [
+          {
+            "node": "Describe decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reject": {
+      "main": [
+        [
+          {
+            "node": "Describe decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Describe decision": {
+      "main": [
+        [
+          {
+            "node": "Send decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Istanbul",
+    "saveManualExecutions": true
+  },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}
