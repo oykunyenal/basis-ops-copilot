@@ -135,26 +135,29 @@ Claude Code'a her adımda şunu söyle: *"PLAN.md'de Adım N'yi yap. Önce plan�
 **Commit:** `feat(fakesap): simulate SM37/ST22/SU01/STMS/STRUST/SM50 with chaos settings`
 
 ### Adım 2: Domain + Application
-- [ ] Domain:
+- [x] Domain:
   - `SapSystem` (Sid, Role: Prod/Quality/Dev).
   - `HealthScan` (zaman, sistem, süre, durum).
   - `Finding`: Category (Job, Dump, User, Transport, Certificate, WorkProcess), Severity (Info, Warning, Critical), Key (tekrarı engellemek için örn. `JOB:PRD:Z_BILLING:1234`), FirstSeen, LastSeen, Resolved.
   - `ActionRequest` durum makinesi: `Requested → Approved → Executing → Succeeded | Failed`, `Requested → Rejected`. Geçersiz geçiş exception fırlatır.
+    - Ek geçiş: `Executing → Approved` (geçici hata, `NextAttemptAt` ile retry). `MaxAttempts` aşılınca `Failed`.
   - Alanlar: Type, Target, RequestedBy, ApprovedBy, Attempts, LastError, IdempotencyKey.
   - **Kural:** Prod sistemde talep eden kişi kendi talebini onaylayamaz (four-eyes principle).
-  - `AuditEntry`: kim, ne, ne zaman, önceki → sonraki durum.
-- [ ] Kurallar (`IHealthRule`, her biri ayrı sınıf, test edilebilir):
-  - İptal olan job: kritik job listesi (`Z_BILLING*`, `SAP_COLLECTOR*`) → Critical, diğerleri → Warning.
+  - `AuditEntry`: kim, ne, ne zaman, önceki → sonraki durum. Her geçiş kendi audit kaydını döndürür.
+  - `FindingReconciler`: yeni tarama sonucunu açık bulgularla birleştirir (aç / güncelle / çözüldü). Çözülen bulgu tekrar görülürse yeni bulgu açılır.
+- [x] Kurallar (`IHealthRule`, her biri ayrı sınıf, test edilebilir):
+  - İptal olan job: kritik job listesi (`Z_BILLING*`, `SAP_COLLECTOR*`) → Critical, diğerleri → Warning. Aynı job'ın sonradan başarılı çalışması varsa bulgu çözülmüş sayılır.
   - Dump: son 1 saatte aynı tipten ≥ 5 → Warning, ≥ 20 → Critical.
   - Sertifika: < 30 gün → Warning, < 7 gün → Critical.
   - Transport: RC ≥ 8 → Critical, RC 4 → Info.
   - Work process: DIA doluluk > %80 → Warning, > %95 → Critical.
   - Kilitli kullanıcı: Info (tek başına alarm değil, self-servis için listelenir).
-- [ ] Application:
-  - Portlar: `ISapGateway`, `IAiAnalyzer`, `IClock` (ya da `TimeProvider`).
+- [x] Application:
+  - Portlar: `ISapGateway`, `IAiAnalyzer`, `TimeProvider`. Ek: `ISystemRegistry` (sistem + rol; four-eyes için SAP'ye gitmeden), repository'ler ve `IUnitOfWork`.
   - Komutlar: `RunHealthScan`, `RequestAction`, `ApproveAction`, `RejectAction`.
-  - Sorgular: `GetSystemHealth`, `ListFindings`, `GetAction`, `GetDailyReport`.
+  - Sorgular: `GetSystemHealth`, `ListFindings`, `GetAction`, `GetDailyReport`. Ek (Api için): `ListActions`, `GetAuditLog`.
   - Basit `ICommandHandler<TCommand, TResult>` ve `IQueryHandler<TQuery, TResult>`. Validation handler girişinde yapılır.
+  - Handler'lar `Result<T>` döner (Validation → 400, NotFound → 404, Conflict → 409, Forbidden → 403). Four-eyes ihlali → 403.
 
 **Bitti sayılır:** UnitTests projesinde kural ve durum makinesi testleri yeşil (en az 15 test).
 **Commit:** `feat(domain): findings, rules and action approval state machine`
