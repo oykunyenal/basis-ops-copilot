@@ -180,3 +180,7 @@ S_USER_GRP limited to the user groups that self-service may unlock).
 ## Status
 
 All planned steps are implemented; see the [roadmap](PLAN.md). The optional runbook RAG for the assistant is postponed.
+
+## License
+
+[MIT](LICENSE)
