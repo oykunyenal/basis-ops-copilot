@@ -1,0 +1,149 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1116" viewBox="0 0 1200 1116" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-label="Basis Ops Copilot tech stack">
+<title>Basis Ops Copilot tech stack</title>
+<rect width="1200" height="1116" rx="16" fill="#f6f8fa"/>
+<text x="32" y="52" font-size="26" font-weight="700" fill="#1f2328">Basis Ops Copilot</text>
+<text x="270" y="52" font-size="26" font-weight="400" fill="#59636e">tech stack</text>
+<text x="32" y="80" font-size="14" fill="#59636e">Approval-based SAP Basis operations assistant · .NET 10 · Aspire 13.6 · PostgreSQL · n8n · local LLM</text>
+<text x="32" y="116" font-size="12" font-weight="600" letter-spacing="1.2" fill="#59636e">RUNTIME</text>
+<rect x="32" y="130" width="760" height="414" rx="12" fill="#eef2f7" stroke="#d0d7de" stroke-dasharray="5 4"/>
+<text x="50" y="158" font-size="15" font-weight="600" fill="#1f2328">Aspire AppHost</text>
+<text x="172" y="158" font-size="11.5" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">Aspire.AppHost.Sdk 13.6.5</text>
+<text x="50" y="176" font-size="12.5" fill="#59636e">One dotnet run starts all four · WaitFor ordering · API key in user-secrets</text>
+<rect x="48" y="188" width="356" height="162" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+<rect x="48" y="200" width="3" height="138" rx="1.5" fill="#0969da"/>
+<text x="66" y="218" font-size="15" font-weight="600" fill="#1f2328">BasisOps.Api</text>
+<rect x="340.0" y="203" width="50.0" height="22" rx="11" fill="#eff2f5" stroke="#d0d7de"/>
+<text x="365.0" y="218" font-size="11.5" text-anchor="middle" fill="#0969da" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">:5081</text>
+<text x="66" y="246" font-size="12.5" fill="#1f2328">ASP.NET Core minimal API<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">/api/v1</tspan></text>
+<text x="66" y="266" font-size="12.5" fill="#1f2328">Microsoft.AspNetCore.OpenApi<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">10.0.15</tspan></text>
+<text x="66" y="286" font-size="12.5" fill="#1f2328">Scalar.AspNetCore<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">2.21.0</tspan></text>
+<text x="66" y="306" font-size="12.5" fill="#1f2328">ProblemDetails · X-Api-Key · Idempotency-Key</text>
+<text x="66" y="326" font-size="12.5" fill="#1f2328">Four-eyes approval · xmin concurrency</text>
+<rect x="420" y="188" width="356" height="162" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+<rect x="420" y="200" width="3" height="138" rx="1.5" fill="#0969da"/>
+<text x="438" y="218" font-size="15" font-weight="600" fill="#1f2328">BasisOps.Worker</text>
+<rect x="635.2" y="203" width="126.80000000000001" height="22" rx="11" fill="#eff2f5" stroke="#d0d7de"/>
+<text x="698.6" y="218" font-size="11.5" text-anchor="middle" fill="#0969da" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">BackgroundService</text>
+<text x="438" y="246" font-size="12.5" fill="#1f2328">HealthScanWorker<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">every 60 s</tspan></text>
+<text x="438" y="266" font-size="12.5" fill="#1f2328">ActionExecutorWorker<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">every 2 s</tspan></text>
+<text x="438" y="286" font-size="12.5" fill="#1f2328">FOR UPDATE SKIP LOCKED<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">queue claim</tspan></text>
+<text x="438" y="306" font-size="12.5" fill="#1f2328">Retry, backoff, jitter<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">max 5 attempts</tspan></text>
+<text x="438" y="326" font-size="12.5" fill="#1f2328">Lease recovery<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">2 min</tspan></text>
+<rect x="48" y="366" width="356" height="162" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+<rect x="48" y="378" width="3" height="138" rx="1.5" fill="#57606a"/>
+<text x="66" y="396" font-size="15" font-weight="600" fill="#1f2328">FakeSap</text>
+<rect x="340.0" y="381" width="50.0" height="22" rx="11" fill="#eff2f5" stroke="#d0d7de"/>
+<text x="365.0" y="396" font-size="11.5" text-anchor="middle" fill="#57606a" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">:5090</text>
+<text x="66" y="424" font-size="12.5" fill="#1f2328">SAP simulator<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">minimal API</tspan></text>
+<text x="66" y="444" font-size="12.5" fill="#1f2328">SM37 · ST22 · SU01 · STMS · STRUST · SM50</text>
+<text x="66" y="464" font-size="12.5" fill="#1f2328">BAPIRET2-style return messages</text>
+<text x="66" y="484" font-size="12.5" fill="#1f2328">Chaos settings<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">FailurePercent, LatencyMs</tspan></text>
+<rect x="420" y="366" width="356" height="162" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+<rect x="420" y="378" width="3" height="138" rx="1.5" fill="#1a7f64"/>
+<text x="438" y="396" font-size="15" font-weight="600" fill="#1f2328">PostgreSQL</text>
+<rect x="686.4" y="381" width="75.6" height="22" rx="11" fill="#eff2f5" stroke="#d0d7de"/>
+<text x="724.2" y="396" font-size="11.5" text-anchor="middle" fill="#1a7f64" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">container</text>
+<text x="438" y="424" font-size="12.5" fill="#1f2328">Aspire.Hosting.PostgreSQL<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">13.6.5</tspan></text>
+<text x="438" y="444" font-size="12.5" fill="#1f2328">EF Core + Npgsql<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">10.0.15</tspan></text>
+<text x="438" y="464" font-size="12.5" fill="#1f2328">EFCore.NamingConventions<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">snake_case</tspan></text>
+<text x="438" y="484" font-size="12.5" fill="#1f2328">Partial unique index · xmin</text>
+<text x="438" y="504" font-size="12.5" fill="#1f2328">Data volume<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">basisops-pgdata</tspan></text>
+<text x="812" y="158" font-size="15" font-weight="600" fill="#1f2328">Outside the repo</text>
+<text x="812" y="176" font-size="12.5" fill="#59636e">Existing services, not installed by it</text>
+<rect x="812" y="188" width="356" height="142" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+<rect x="812" y="200" width="3" height="118" rx="1.5" fill="#bc4c00"/>
+<text x="830" y="218" font-size="15" font-weight="600" fill="#1f2328">n8n</text>
+<rect x="1040.0" y="203" width="114.0" height="22" rx="11" fill="#eff2f5" stroke="#d0d7de"/>
+<text x="1097.0" y="218" font-size="11.5" text-anchor="middle" fill="#bc4c00" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">2.47.5 · Docker</text>
+<text x="830" y="246" font-size="12.5" fill="#1f2328">Daily report<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">weekdays 08:00</tspan></text>
+<text x="830" y="266" font-size="12.5" fill="#1f2328">Self-service AI agent<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">no approve tool</tspan></text>
+<text x="830" y="286" font-size="12.5" fill="#1f2328">Telegram approval<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">sendAndWait</tspan></text>
+<text x="830" y="306" font-size="12.5" fill="#1f2328">Calls the Api only<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">X-Api-Key</tspan></text>
+<rect x="812" y="342" width="356" height="162" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+<rect x="812" y="354" width="3" height="138" rx="1.5" fill="#8250df"/>
+<text x="830" y="372" font-size="15" font-weight="600" fill="#1f2328">Ollama</text>
+<rect x="1097.6" y="357" width="56.400000000000006" height="22" rx="11" fill="#eff2f5" stroke="#d0d7de"/>
+<text x="1125.8" y="372" font-size="11.5" text-anchor="middle" fill="#8250df" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">native</text>
+<text x="830" y="400" font-size="12.5" fill="#1f2328">Model<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">qwen3:8b</tspan></text>
+<text x="830" y="420" font-size="12.5" fill="#1f2328">Microsoft.Extensions.AI<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">10.11.0</tspan></text>
+<text x="830" y="440" font-size="12.5" fill="#1f2328">OllamaSharp<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">5.5.2</tspan></text>
+<text x="830" y="460" font-size="12.5" fill="#1f2328">Masked input · JSON schema output</text>
+<text x="830" y="480" font-size="12.5" fill="#1f2328">Rule-based fallback if down</text>
+<rect x="812" y="516" width="356" height="82" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+<rect x="812" y="528" width="3" height="58" rx="1.5" fill="#57606a"/>
+<text x="830" y="546" font-size="15" font-weight="600" fill="#1f2328">Telegram</text>
+<rect x="1091.2" y="531" width="62.800000000000004" height="22" rx="11" fill="#eff2f5" stroke="#d0d7de"/>
+<text x="1122.6" y="546" font-size="11.5" text-anchor="middle" fill="#57606a" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">Bot API</text>
+<text x="830" y="574" font-size="12.5" fill="#1f2328">Morning report · Approve / Reject</text>
+<text x="32" y="638" font-size="12" font-weight="600" letter-spacing="1.2" fill="#59636e">CODE LAYERS</text><text x="32" y="656" font-size="12.5" fill="#59636e">Dependencies point inward: Domain ← Application ← Infrastructure ← Api / Worker</text>
+<rect x="32" y="672" width="272" height="142" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+<rect x="32" y="684" width="3" height="118" rx="1.5" fill="#0969da"/>
+<text x="50" y="702" font-size="15" font-weight="600" fill="#1f2328">Domain</text>
+<rect x="208.0" y="687" width="82.0" height="22" rx="11" fill="#eff2f5" stroke="#d0d7de"/>
+<text x="249.0" y="702" font-size="11.5" text-anchor="middle" fill="#0969da" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">0 packages</text>
+<text x="50" y="730" font-size="12.5" fill="#1f2328">Entities · health rules</text>
+<text x="50" y="750" font-size="12.5" fill="#1f2328">Action state machine</text>
+<text x="50" y="770" font-size="12.5" fill="#1f2328">FindingReconciler</text>
+<text x="50" y="790" font-size="12.5" fill="#1f2328">AuditEntry per transition</text>
+<rect x="320" y="672" width="272" height="142" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+<rect x="320" y="684" width="3" height="118" rx="1.5" fill="#0969da"/>
+<text x="338" y="702" font-size="15" font-weight="600" fill="#1f2328">Application</text>
+<rect x="502.4" y="687" width="75.6" height="22" rx="11" fill="#eff2f5" stroke="#d0d7de"/>
+<text x="540.2" y="702" font-size="11.5" text-anchor="middle" fill="#0969da" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">use cases</text>
+<text x="338" y="730" font-size="12.5" fill="#1f2328">Own command / query handlers</text>
+<text x="338" y="750" font-size="12.5" fill="#1f2328">No MediatR · Result&lt;T&gt;</text>
+<text x="338" y="770" font-size="12.5" fill="#1f2328">ActionExecutor · TimeProvider</text>
+<text x="338" y="790" font-size="12.5" fill="#1f2328">M.E.Options · Logging<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">10.0.15</tspan></text>
+<rect x="608" y="672" width="272" height="142" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+<rect x="608" y="684" width="3" height="118" rx="1.5" fill="#0969da"/>
+<text x="626" y="702" font-size="15" font-weight="600" fill="#1f2328">Infrastructure</text>
+<rect x="796.8" y="687" width="69.2" height="22" rx="11" fill="#eff2f5" stroke="#d0d7de"/>
+<text x="831.4" y="702" font-size="11.5" text-anchor="middle" fill="#0969da" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">adapters</text>
+<text x="626" y="730" font-size="12.5" fill="#1f2328">ISapGateway anti-corruption layer</text>
+<text x="626" y="750" font-size="12.5" fill="#1f2328">Http.Resilience<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">10.11.0</tspan></text>
+<text x="626" y="770" font-size="12.5" fill="#1f2328">Masking<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">USER_1, HOST_1, IP_1</tspan></text>
+<text x="626" y="790" font-size="12.5" fill="#1f2328">EF Core DbContext, migrations</text>
+<rect x="896" y="672" width="272" height="142" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+<rect x="896" y="684" width="3" height="118" rx="1.5" fill="#0969da"/>
+<text x="914" y="702" font-size="15" font-weight="600" fill="#1f2328">ServiceDefaults</text>
+<rect x="1097.6" y="687" width="56.400000000000006" height="22" rx="11" fill="#eff2f5" stroke="#d0d7de"/>
+<text x="1125.8" y="702" font-size="11.5" text-anchor="middle" fill="#0969da" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">shared</text>
+<text x="914" y="730" font-size="12.5" fill="#1f2328">OpenTelemetry<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">1.21.0</tspan></text>
+<text x="914" y="750" font-size="12.5" fill="#1f2328">AspNetCore, Http, Runtime</text>
+<text x="914" y="770" font-size="12.5" fill="#1f2328">ServiceDiscovery<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">10.11.0</tspan></text>
+<text x="914" y="790" font-size="12.5" fill="#1f2328">Health checks, resilience</text>
+<text x="32" y="854" font-size="12" font-weight="600" letter-spacing="1.2" fill="#59636e">QUALITY AND DELIVERY</text>
+<rect x="32" y="870" width="368" height="182" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+<rect x="32" y="882" width="3" height="158" rx="1.5" fill="#1a7f37"/>
+<text x="50" y="900" font-size="15" font-weight="600" fill="#1f2328">Tests</text>
+<rect x="310.4" y="885" width="75.6" height="22" rx="11" fill="#eff2f5" stroke="#d0d7de"/>
+<text x="348.2" y="900" font-size="11.5" text-anchor="middle" fill="#1a7f37" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">195 tests</text>
+<text x="50" y="928" font-size="12.5" fill="#1f2328">xunit.v3<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">4.0.3</tspan></text>
+<text x="50" y="948" font-size="12.5" fill="#1f2328">Microsoft.Testing.Platform<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">runner</tspan></text>
+<text x="50" y="968" font-size="12.5" fill="#1f2328">Testcontainers.PostgreSql<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">4.16.0</tspan></text>
+<text x="50" y="988" font-size="12.5" fill="#1f2328">WebApplicationFactory<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">10.0.15</tspan></text>
+<text x="50" y="1008" font-size="12.5" fill="#1f2328">FakeTimeProvider<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">10.11.0</tspan></text>
+<text x="50" y="1028" font-size="12.5" fill="#1f2328">Unit · integration · gateway contract</text>
+<rect x="416" y="870" width="368" height="182" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+<rect x="416" y="882" width="3" height="158" rx="1.5" fill="#1a7f37"/>
+<text x="434" y="900" font-size="15" font-weight="600" fill="#1f2328">GitHub Actions</text>
+<rect x="668.8" y="885" width="101.2" height="22" rx="11" fill="#eff2f5" stroke="#d0d7de"/>
+<text x="719.4" y="900" font-size="11.5" text-anchor="middle" fill="#1a7f37" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">ubuntu-latest</text>
+<text x="434" y="928" font-size="12.5" fill="#1f2328">Restore, Release build, test</text>
+<text x="434" y="948" font-size="12.5" fill="#1f2328">Test summary + TRX artifact</text>
+<text x="434" y="968" font-size="12.5" fill="#1f2328">Actions pinned by commit SHA</text>
+<text x="434" y="988" font-size="12.5" fill="#1f2328">Rulesets: no force push, CI required</text>
+<text x="434" y="1008" font-size="12.5" fill="#1f2328">Secret scanning + push protection</text>
+<text x="434" y="1028" font-size="12.5" fill="#1f2328">Dependabot alerts</text>
+<rect x="800" y="870" width="368" height="182" rx="10" fill="#ffffff" stroke="#d0d7de"/>
+<rect x="800" y="882" width="3" height="158" rx="1.5" fill="#8250df"/>
+<text x="818" y="900" font-size="15" font-weight="600" fill="#1f2328">Observability</text>
+<rect x="1110.4" y="885" width="43.6" height="22" rx="11" fill="#eff2f5" stroke="#d0d7de"/>
+<text x="1132.2" y="900" font-size="11.5" text-anchor="middle" fill="#8250df" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">OTLP</text>
+<text x="818" y="928" font-size="12.5" fill="#1f2328">Aspire dashboard<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">traces, logs, metrics</tspan></text>
+<text x="818" y="948" font-size="12.5" fill="#1f2328">Spans<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">health-scan, execute-action</tspan></text>
+<text x="818" y="968" font-size="12.5" fill="#1f2328">LLM calls<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">source BasisOps.Ai</tspan></text>
+<text x="818" y="988" font-size="12.5" fill="#1f2328">Structured logs<tspan dx="8" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5">action id, SID</tspan></text>
+<text x="818" y="1008" font-size="12.5" fill="#1f2328">ASP.NET Core, HttpClient, runtime</text>
+<text x="32" y="1088" font-size="12" fill="#59636e" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">.NET SDK 10.0.301 · C# latest · Nullable · TreatWarningsAsErrors · Central Package Management · .slnx</text>
+</svg>

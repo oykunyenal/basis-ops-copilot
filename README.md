@@ -85,6 +85,13 @@ n8n/                           Workflows: daily report, self-service assistant, 
 
 Dependencies point inward: `Domain ← Application ← Infrastructure ← Api / Worker`.
 
+## Tech stack
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/tech-stack-dark.svg">
+  <img alt="Tech stack: Aspire AppHost with the Api, the Worker, FakeSap and PostgreSQL; n8n, Ollama and Telegram outside the repo; the code layers; tests, CI and observability, with package versions" src="docs/images/tech-stack-light.svg">
+</picture>
+
 ## Run it in 5 minutes
 
 Prerequisites: .NET 10 SDK and Docker. Optional: [Ollama](https://ollama.com) with `ollama pull qwen3:8b` for AI summaries.
